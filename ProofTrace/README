@@ -13,6 +13,10 @@ is properly installed on a system.
 The `proof` of a `thm` represents the tree of basic rewrites that were applied
 to axioms and definitions to demonstrate the theorem.
 
+# Requirements
+
+  OCaml >= 4.02.0
+
 # Generated Dataset
 
 ProofTrace can generate three files from a loaded HOL Light context:
@@ -89,10 +93,7 @@ associated proofs).
 
 # #use "ProofTrace/proofs.ml";;
 
-# dump_theorems "ProofTrace/prooftrace.theorems";;
-# dump_proofs "ProofTrace/prooftrace.proofs";;
-# dump_names "ProofTrace/prooftrace.names";;
-
-(* Each of these steps may take a while. The generated set of files for a    *)
-(* fresh hol.ml context is generally 8GB large.                              *)
+# dump_theorems "ProofTrace/prooftrace.theorems";; (* ~2h45, 40 Go *)
+# dump_proofs "ProofTrace/prooftrace.proofs";; (* 7.3 Go *)
+# dump_names "ProofTrace/prooftrace.names";; (* 112 Ko *)
 ```
