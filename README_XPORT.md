@@ -20,7 +20,7 @@ Requirements
 - camlp5 6.17
 - dedukti 2.7
 - lambdapi 2.3
-- ledit 2.03 (optional, to ease ocaml toplevel)
+- ledit 2.03 (optional, to ease the use of ocaml toplevel)
 
 Usage
 -----
@@ -35,7 +35,7 @@ If you want to use ledit, write:
 ledit -x -h ~/.ocaml_history ocaml -I `camlp5 -where` camlp5o.cma
 ```
 
-You can add an alias in your `~/.bashrc` file to save time.
+You can add an alias in your `~/.bashrc` to save time.
 
 Inside the OCaml toplevel, write:
 ```
@@ -73,16 +73,16 @@ Implementation
 --------------
 
 For extracting proofs out of HOL-Light, the implementation reuses
-parts of the code of
+parts of
 [ProofTrace](https://github.com/fblanqui/hol-light/tree/master/ProofTrace)
 developed by Stanislas Polu in 2019.
 
 Modified HOL-Light files:
-- fusion.ml: file defining the theorem and proof types
+- `fusion.ml`: file defining the theorem and proof types
 
 Added files:
-- xprelude.ml: provides a few global references
-- xlib.ml: functions on types and terms
-- xnames.ml: compute the list of HOL-Light files and a map associating the list of theorems proved in each file (following ProofTrace/proofs.ml)
-- xdk.ml: function exporting HOL-Light proofs to Dedukti
-- xlp.ml: function exporting HOL-Light proofs to Lambdapi
+- `xprelude.ml`: provides a few global references
+- `xlib.ml`: functions on types and terms
+- `xnames.ml`: compute the list of HOL-Light files and a map associating the list of theorems proved in each file (following ProofTrace/proofs.ml)
+- `xdk.ml`: function exporting HOL-Light proofs to Dedukti
+- `xlp.ml`: function exporting HOL-Light proofs to Lambdapi
