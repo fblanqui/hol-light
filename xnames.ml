@@ -2,6 +2,8 @@
 (* Compute the theorems of each file, following ProofTrace/proofs.ml. *)
 (****************************************************************************)
 
+unset_jrh_lexer;;
+
 let PROVE_1_RE = Str.regexp (String.concat "" (
   "\\(let\\|and\\)[ \n\t]*"::
   "\\([a-zA-Z0-9_-]+\\)[ \n\t]*"::
@@ -118,8 +120,6 @@ let source_files() =
 
 let files = log "compute list of files ...@."; source_files();;
 
-unset_jrh_lexer;;
-
 let update_map_file_thms() =
   log "compute theorem names in each file ...@.";
   map_file_thms :=
@@ -127,5 +127,40 @@ let update_map_file_thms() =
       (fun map f -> MapStr.add f (theorems_of_file f) map)
       MapStr.empty files
 ;;
+
+(****************************************************************************)
+(* Compute the map thm_id -> name, following ProofTrace/proof.ml. *)
+(****************************************************************************)
+
+let eval code =
+  let as_buf = Lexing.from_string code in
+  let parsed = !Toploop.parse_toplevel_phrase as_buf in
+  ignore (Toploop.execute_phrase true Format.std_formatter parsed)
+
+let idx = ref 0;;
+
+let cmd_set_idx name =
+  Printf.sprintf "idx := index_of (proof_of %s);;" name
+;;
+
+let update_map_thm_id_name() =
+  log "compute map id -> theorem ...";
+  map_thm_id_name :=
+    MapStr.fold
+      (fun filename thm_names map ->
+        List.fold_left
+          (fun map name ->
+            if name = "_" then map else
+            let name = if name = "_FALSITY_" then name ^ "DEF" else name in
+              (* to give a name to the theorem "_FALSITY_" different
+                 from the constant "_FALSITY_". *)
+            try eval (cmd_set_idx name); MapInt.add !idx name map
+            with _ -> map)
+          map thm_names)
+      !map_file_thms MapInt.empty
+;;
+
+let print_map_thm_id_name() =
+  MapInt.iter (fun k name -> log "%d %s@." k name) !map_thm_id_name;;
 
 set_jrh_lexer;;

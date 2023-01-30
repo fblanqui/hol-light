@@ -41,10 +41,8 @@ Inside the OCaml toplevel, write:
 ```
 #use "xprelude.ml";;
 #use "hol.ml";; (* or part of it *)
-(* load any HOL-Light file here *)
+(* load any other HOL-Light file here *)
 #use "xlib.ml";;
-(*not necessary yet: update_map_file_thms();;*)
-(*not necessary yet: update_map_thm_id_name();;*)
 update_map_const_type_vars_pos();;
 ```
 
@@ -58,6 +56,16 @@ To export to Lambdapi:
 ```
 #use "xlp.ml";;
 export_to_lp "myfile.lp" All;;
+```
+
+To get the list of HOL-Light files and named theorems:
+```
+#use "xnames.ml";;
+files;;
+update_map_file_thms();;
+!map_file_thms;;
+update_map_thm_id_name();;
+!map_thm_id_name;;
 ```
 
 Experiments:
