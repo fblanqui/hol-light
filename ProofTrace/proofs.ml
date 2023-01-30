@@ -207,11 +207,9 @@ let source_files() =
       let contents = List.rev_map (Filename.concat dir) contents in
       let dirs, files =
         List.fold_left (fun (dirs,files) f ->
-            begin try
                           match Sys.is_directory f with
                           | false -> (dirs, f::files)  (* Regular file *)
                           | true -> (f::dirs, files)  (* Directory *)
-              with Sys_error _ -> (dirs, files) end
         ) ([],[]) contents in
       let matched = List.filter (select) files in
         walk (matched @ acc) (dirs @ tail)

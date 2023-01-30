@@ -40,10 +40,6 @@ change in the camlp4 preprocessor) you will also need to get camlp5
 (version >= 4.07). Installing both items of software should not be too
 difficult, depending on the platform.
 
-Currently, HOL-Light works with ocaml <= 4.12.0 and camlp5 <= 7.14.
-
-Personaly, I could use HOL-Light only with ocaml 4.02.3 and camlp5 6.17.
-
  1. OCaml: there are packages for many Linux distributions. For
     example, on a debian derivative like Ubuntu, you may just need
     to do the following:
@@ -96,7 +92,7 @@ Personaly, I could use HOL-Light only with ocaml 4.02.3 and camlp5 6.17.
 
     However, you may get a version in "transitional" instead of
     "strict" mode (do "camlp5 -pmode" to check which you have).
-    
+
 Now for HOL Light itself. The instructions below assume a Unix-like
 environment such as Linux [or Cygwin (see www.cygwin.com) under
 Windows], but the steps automated by the Makefile are easy enough to
@@ -160,14 +156,6 @@ be available for some platforms. First the basic approach:
                 Camlp5 parsing version 7.03
 
         #
-
-    In case ocaml complains with "Cannot find file topfind" do:
-
-        opam install ocamlfind
-
-    In case ocaml complains with "Cannot find file camlp5o.cma" do:
-
-        ocaml -I `camlp5 -where` camlp5o.cma
 
     HOL Light is now ready for the user to start proving theorems. You
     can also use the load process (2) and (3) in other directories, but
