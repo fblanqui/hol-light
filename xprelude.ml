@@ -6,14 +6,7 @@
 #load "str.cma";;
 
 let out = Printf.fprintf;;
-let log = Format.printf;;
-
-let log_list log_elt xs =
-  match xs with
-  | [] -> log "[]"
-  | x::xs ->
-     log "["; log_elt x; List.iter (fun x -> log "; "; log_elt x) xs; log "]"
-;;
+let log = Printf.printf;;
 
 let time_of p =
   let t0 = Sys.time() in

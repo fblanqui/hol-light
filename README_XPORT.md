@@ -37,7 +37,7 @@ ledit -x -h ~/.ocaml_history ocaml -I `camlp5 -where` camlp5o.cma
 
 You can add an alias in your `~/.bashrc` to save time.
 
-Inside the OCaml toplevel, write:
+In the OCaml toplevel, write:
 ```
 #use "xprelude.ml";;
 #use "hol.ml";; (* or part of it *)
@@ -46,13 +46,13 @@ Inside the OCaml toplevel, write:
 update_map_const_type_vars_pos();;
 ```
 
-To export to Dedukti:
+To export to Dedukti, write then:
 ```
 #use "xdk.ml";;
 export_to_dk "myfile.dk" All;;
 ```
 
-To export to Lambdapi:
+To export to Lambdapi, write thn:
 ```
 #use "xlp.ml";;
 export_to_lp "myfile.lp" All;;
@@ -68,14 +68,59 @@ update_map_thm_id_name();;
 !map_thm_id_name;;
 ```
 
+Checking the generated dk/lp files:
+-----------------------------------
+
+As hol-light and dkcheck/lambdapi do not use the same ocaml versions,
+it is convenient to proceed as follows:
+
+Xterm 1 (for HOL-Light):
+```
+cd $hol_light_directory
+opam switch link 4.02.3
+eval `opam env`
+ocaml -I `camlp5 -where` camlp5o.cma
+```
+
+Xterm 2 (for checking dk/lp files):
+```
+cd $hol_light_directory
+mkdir xport
+cd xport
+opam switch link 4.14.1
+eval `opam env`
+```
+
+To check the generated dk file, write in Xterm2:
+```
+dk check myfile.dk
+```
+
+To check the generated lp file, write in Xterm2:
+```
+lambdapi check --map-dir hol-light:. myfile.lp
+```
+
+or create a file `lambdapi.pkg`:
+```
+package_name = hol-light
+root_path = hol-light
+```
+
+and simply write in a shell:
+
+```
+lambdapi check myfile.lp
+```
+
 Experiments:
 ------------
 
 On `hol.ml` until `arith.ml` (by commenting from `loads "wf.ml"` to the end):
-- generation time for dk: 1m50s, 395 Mo
-- checking time with dk check: 1m10s 
-- generation time for lp: 1m13s, 216 Mo
-- checking time with lambdapi: 1m42s
+- generation time for dk: 1m52s, 395 Mo
+- checking time with dk check: 1m12s 
+- generation time for lp: 1m08s, 217 Mo
+- checking time with lambdapi: 5m46s
 
 Implementation
 --------------

@@ -43,9 +43,7 @@ let list elt oc xs = list_sep "" elt oc xs;;
 
 let list_prefix p elt oc xs = list (prefix p elt) oc xs;;
 
-let depth = ref 0;;
-
-let rec tab oc k = if k <= 0 then () else out oc " %a" tab (k-1);;
+let olist elt oc xs = out oc "[%a]" (list_sep "; " elt) xs;;
 
 (****************************************************************************)
 (* Functions on types and terms. *)
@@ -173,11 +171,6 @@ let add_var rmap v =
    to all the variables occurring in the list of variables [vs]. *)
 let renaming_map = List.fold_left add_var [];;
 
-(* [renaming_map_thm th] returns an association list giving new distinct names
-   to all the variables occurring in [th]. *)
-let renaming_map_thm th =
-  let ts,t = dest_thm th in renaming_map (freesl (t::ts));;
-
 (* Subterm positions in types are represented as list of natural numbers. *)
 
 (* [subtype b p] returns the type at position [p] in the type [b]. *)
@@ -208,9 +201,6 @@ let type_vars_pos b =
 type_vars_pos
   (mk_type("fun",[mk_vartype"a"
                  ;mk_type("fun",[mk_vartype"a";mk_vartype"b"])]));;*)
-
-(* Logging function for a position. *)
-let log_pos = log_list (log "%d");;
 
 (****************************************************************************)
 (* Functions on proofs. *)
@@ -260,7 +250,7 @@ let type_var_pos_list = list_sep "; " (list_sep "," int);;
 
 let print_map_const_type_vars_pos() =
   MapStr.iter
-    (fun c ps -> log "%s " c; log_list log_pos ps; log "\n")
+    (fun c ps -> log "%s %a\n" c (olist (olist int)) ps)
     !map_const_type_vars_pos;;
 
 let const_type_vars_pos n =

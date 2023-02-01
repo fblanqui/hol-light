@@ -17,6 +17,20 @@ let is_valid_id =
    removed once the fix is merged in the next release. *)
 let valid_name n = if is_valid_id n then n else "{|" ^ String.escaped n ^ "|}"
 
+(* We rename some symbols to make files smaller and more readable. *)
+let valid_name = function
+  | "=" -> "eq"
+  | "," -> "̦pair"
+  | "@" -> "choice"
+  | "\\/" -> "or"
+  | "/\\" -> "and"
+  | "==>" -> "imp"
+  | "!" -> "all"
+  | "?" -> "ex"
+  | "?!" -> "ex1"
+  | "~" -> "not"
+  | n -> valid_name n;;
+
 let name oc n = string oc (valid_name n);;
 
 let suffix s oc n = name oc (n ^ s);;
@@ -155,23 +169,15 @@ let proof tvs rmap =
     let sub = subproof tvs rmap [] [] ts in
     match content with
     | Prefl(t) ->
-       out oc "REFL %a %a" typ (type_of t) term t
+       out oc "REFL %a %a" typ (get_eq_type p) term t
     | Ptrans(p1,p2) ->
        let a,x,y = get_eq_type_args p1 in
        let _,z = get_eq_args p2 in
        out oc "TRANS %a %a %a %a %a %a"
          typ (get_eq_type p1) term x term y term z sub p1 sub p2
     | Pmkcomb(p1,p2) ->
-       let a,b,s,t =
-         let Proof(_,th,_) = p1 in
-         match concl th with
-         | Comb(Comb(Const("=",Tyapp("fun",[b1;b2])),s),t) ->
-            begin match b1 with
-            | Tyapp("fun",[a;b]) -> a,b,s,t
-            | _ -> assert false
-            end
-         | _ -> assert false
-       in
+       let ab,s,t = get_eq_type_args p1 in
+       let a,b = match ab with Tyapp("fun",[a;b]) -> a,b | _ -> assert false in
        let u,v = get_eq_args p2 in
        out oc "MK_COMB %a %a %a %a %a %a %a %a"
          typ a typ b term s term t term u term v sub p1 sub p2
@@ -205,7 +211,7 @@ let proof tvs rmap =
     | Pinstt(p,[]) -> proof oc p
     | Pinstt(p,s) ->
        out oc "%a" (subproof tvs rmap s [] ts) p
-    | Pdef(t,n,b) ->
+    | Pdef(_,n,b) ->
        let ps = const_type_vars_pos n in
        (*out oc "(;t=%a; b=%a; ps=%a;)" term t typ b type_var_pos_list ps;*)
        begin match List.map (subtype b) ps with
@@ -220,7 +226,7 @@ let proof tvs rmap =
        out oc "axiom_%d%a%a" k
          (list_prefix " " typ) (type_vars_in_term t)
          (list_prefix " " term) (frees t)
-    | Pdeft(p,t,n,b) ->
+    | Pdeft(_,t,_,_) ->
        let k =
          try pos_first (fun th -> concl th = t) (axioms())
          with Not_found -> assert false
@@ -250,7 +256,8 @@ let decl_sym oc (n,b) =
 ;;
 
 let decl_def oc th =
-  let rmap = renaming_map_thm th in
+  let t = concl th in
+  let rmap = renaming_map [] in (* definitions are closed *)
   match concl th with
   | Comb(Comb(Const("=",_),Const(n,_)),_) as c ->
      let tvs = type_vars_in_term c in
@@ -261,12 +268,13 @@ let decl_def oc th =
 
 let decl_axioms oc ths =
   let axiom i th =
-    let rmap = renaming_map_thm th in
-    let c = concl th in
-    let tvs = type_vars_in_term c in
+    let t = concl th in
+    let xs = frees t in
+    let rmap = renaming_map xs in
+    let tvs = type_vars_in_term t in
     out oc "def axiom_%d : %a%aPrf %a.\n"
       i (list (decl_typ_param tvs)) tvs
-      (list (decl_param tvs rmap)) (frees c) (term tvs rmap) c
+      (list (decl_param tvs rmap)) xs (term tvs rmap) t
   in
   List.iteri axiom ths
 ;;
@@ -326,7 +334,7 @@ let theory oc =
 
 (* [theorem_as_axiom oc k] outputs on [oc] the proof of index [k]. *)
 let theorem oc k =
-  (*log "theorem %d ...@." k;*)
+  (*log "theorem %d ...\n%!" k;*)
   let p = proof_at k in
   let Proof(_,thm,content) = p in
   let ts,t = dest_thm thm in
@@ -349,7 +357,7 @@ let theorem oc k =
 (* [theorem_as_axiom oc k] outputs on [oc] the theorem of index [k] as
    an axiom. *)
 let theorem_as_axiom oc k =
-  (*log "theorem %d as axiom ...@." k;*)
+  (*log "theorem %d as axiom ...\n%!" k;*)
   let p = proof_at k in
   let Proof(_,thm,content) = p in
   let ts,t = dest_thm thm in
@@ -379,7 +387,7 @@ let proofs_in_range oc = function
    file the proofs in range [r]. *)
 let export_to_dk filename r =
   print_time();
-  log "generate %s ...@." filename;
+  log "generate %s ...\n%!" filename;
   let oc = open_out filename in
   theory oc;
   proofs_in_range oc r;
