@@ -22,26 +22,45 @@ or ocaml 4.14.1 and camlp5.8.00.03
 - lambdapi 2.3
 - ledit (optional, to ease the use of ocaml toplevel)
 
-Usage
------
+Installation
+------------
 
-The first time you clone hol-light, or if you change your version of
-ocaml and camlp5, do:
+Get the sources of hol-light:
+```
+git clone https://github.com/jrh13/hol-light.git
+```
+
+In the following, we assume that we are in the `hol-light` directory
+created by the previous `git clone` command:
+```
+cd hol-light
+```
+
+To setup hol-light, do the first time you clone hol-light, or if you
+change the version of ocaml or the version of camlp5:
 
 ```
-cd $hol_light_directory
 make
 ```
 
+Get the sources of the dk branch:
+```
+git remote add deducteam https://github.com/Deducteam/hol-light.git
+fetch deducteam
+git checkout deducteam/dk
+```
+
+Usage
+-----
+
 Run the OCaml toplevel:
 ```
-cd $hol_light_directory
-ocaml -I `camlp5 -where` camlp5o.cma
+ocaml
 ```
 
 If you want to use ledit, write:
 ```
-ledit -x -h ~/.ocaml_history ocaml -I `camlp5 -where` camlp5o.cma
+ledit -x -h ~/.ocaml_history ocaml
 ```
 
 You can add an alias in your `~/.bashrc` to save time.
@@ -49,7 +68,7 @@ You can add an alias in your `~/.bashrc` to save time.
 In the OCaml toplevel, write:
 ```
 #use "xprelude.ml";;
-#use "hol.ml";; (* or part of it *)
+#use "hol.ml";;
 (* load any other HOL-Light file here *)
 #use "xlib.ml";;
 update_map_const_type_vars_pos();;
@@ -80,15 +99,15 @@ update_map_thm_id_name();;
 Checking the generated dk/lp files:
 -----------------------------------
 
-As hol-light and dkcheck/lambdapi do not use the same ocaml versions,
-it is convenient to proceed as follows:
+In case hol-light and dkcheck/lambdapi do not use the same ocaml
+versions, it is convenient to put generated files in a subdirectory
+and tell opam to use different switches in each directory:
 
 Xterm 1 (for HOL-Light):
 ```
 cd $hol_light_directory
 opam switch link 4.02.3
 eval `opam env`
-ocaml -I `camlp5 -where` camlp5o.cma
 ```
 
 Xterm 2 (for checking dk/lp files):
@@ -143,7 +162,7 @@ Modified HOL-Light files:
 - `fusion.ml`: file defining the theorem and proof types
 
 Added files:
-- `xprelude.ml`: provides a few global references
+- `xprelude.ml`: load the necessary modules and provides a few global references
 - `xlib.ml`: functions on types and terms
 - `xnames.ml`: compute the list of HOL-Light files and a map associating the list of theorems proved in each file (following ProofTrace/proofs.ml)
 - `xdk.ml`: function exporting HOL-Light proofs to Dedukti

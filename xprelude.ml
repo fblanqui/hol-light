@@ -2,6 +2,9 @@
 (* Definitions shared between all files for Dedukti/Lambdapi export. *)
 (****************************************************************************)
 
+#use "topfind";;
+#require "camlp5";;
+#load "camlp5o.cma";;
 #load "unix.cma";;
 #load "str.cma";;
 
