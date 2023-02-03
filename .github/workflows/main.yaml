@@ -1,0 +1,39 @@
+on:
+  pull_request:
+    types: [opened, synchronize, edited, reopened]
+  push:
+  workflow_dispatch:
+jobs:
+  hol-light-to-dedukti:
+    strategy:
+      fail-fast: false
+      matrix:
+        ocaml-version: [4.14.1]
+        camlp5-version: [8.00.03]
+        dedukti-version: [2.7]
+        lambdapi-version: [2.3.0]
+    runs-on: ubuntu-latest
+    steps:
+    # actions/checkout must be done BEFORE avsm/setup-ocaml
+      - name: Checkout hol-light
+        uses: actions/checkout@v3
+      - name: Install opam
+        uses: avsm/setup-ocaml@v2
+        with:
+          ocaml-compiler: ${{ matrix.ocaml-version }}
+      - name: Install hol-light dependencies, dedukti and lambdapi
+        run: |
+          sudo apt-get install -y libipc-system-simple-perl libstring-shellquote-perl
+          opam install camlp5.${{ matrix.camlp5-version }} num ocamlfind dedukti.${{ matrix.dedukti-version }} lambdapi.${{ matrix.lambdapi-version }}
+      - name: Generate and check dk output
+        run: |
+          eval `opam env`
+          make
+          ./hol2dk xhol.ml recursion.dk
+          dk check recursion.dk
+      - name: Generate and check lp output
+        run: |
+          eval `opam env`
+          make
+          ./hol2lp xhol.ml recursion.lp
+          lambdapi check --map-dir=hol-light:. recursion.lp

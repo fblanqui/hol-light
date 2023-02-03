@@ -16,17 +16,26 @@ rewriting that can read and generate Dedukti proofs.
 Requirements
 ------------
 
-- ocaml 4.02.3
-- camlp5 6.17
+- ocaml 4.02.3 and camlp5 6.17
+or ocaml 4.14.1 and camlp5.8.00.03
 - dedukti 2.7
 - lambdapi 2.3
-- ledit 2.03 (optional, to ease the use of ocaml toplevel)
+- ledit (optional, to ease the use of ocaml toplevel)
 
 Usage
 -----
 
+The first time you clone hol-light, or if you change your version of
+ocaml and camlp5, do:
+
+```
+cd $hol_light_directory
+make
+```
+
 Run the OCaml toplevel:
 ```
+cd $hol_light_directory
 ocaml -I `camlp5 -where` camlp5o.cma
 ```
 

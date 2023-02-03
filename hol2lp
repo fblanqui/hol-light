@@ -1,0 +1,33 @@
+#!/bin/sh
+
+if test $# -ne 2; then echo "usage: $0 file.ml file.dk"; exit 1; fi
+
+cat << EOF | ocaml
+print_endline "------------------------------------------------------------";;
+print_endline "#use \"topfind\";;";;
+#use "topfind";;
+print_endline "------------------------------------------------------------";;
+print_endline "#require \"camlp5\";;";;
+#require "camlp5";;
+print_endline "------------------------------------------------------------";;
+print_endline "#load \"camlp5o.cma\";;";;
+#load "camlp5o.cma";;
+print_endline "------------------------------------------------------------";;
+print_endline "#use \"xprelude.ml\";;";;
+#use "xprelude.ml";;
+print_endline "------------------------------------------------------------";;
+print_endline "#use \"$1\";;";;
+#use "$1";;
+print_endline "------------------------------------------------------------";;
+print_endline "#use \"xlib.ml\";;";;
+#use "xlib.ml";;
+print_endline "------------------------------------------------------------";;
+print_endline "update_map_const_type_vars_pos();;";;
+update_map_const_type_vars_pos();;
+print_endline "------------------------------------------------------------";;
+print_endline "#use \"xlp.ml\";;";;
+#use "xlp.ml";;
+print_endline "------------------------------------------------------------";;
+print_endline "export_to_lp \"$2\" (Upto 50000);;";;
+export_to_lp "$2" (Upto 50000);;
+EOF

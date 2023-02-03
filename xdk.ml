@@ -20,7 +20,7 @@ let valid_name n = if is_valid_id n then n else "{|" ^ String.escaped n ^ "|}"
 (* We rename some symbols to make files smaller and more readable. *)
 let valid_name = function
   | "=" -> "eq"
-  | "," -> "̦pair"
+  | "," -> "pair"
   | "@" -> "choice"
   | "\\/" -> "or"
   | "/\\" -> "and"
@@ -258,11 +258,12 @@ let decl_sym oc (n,b) =
 let decl_def oc th =
   let t = concl th in
   let rmap = renaming_map [] in (* definitions are closed *)
-  match concl th with
-  | Comb(Comb(Const("=",_),Const(n,_)),_) as c ->
-     let tvs = type_vars_in_term c in
-     out oc "%a : %aPrf %a.\n"
-       (suffix "_def") n (list (decl_typ_param tvs)) tvs (term tvs rmap) c
+  match t with
+  | Comb(Comb(Const("=",_),Const(n,_)),_) ->
+     let tvs = type_vars_in_term t in
+     out oc "%a : %aPrf %a.\n" (suffix "_def") n
+       (list (decl_typ_param tvs)) tvs
+       (term tvs rmap) t
   | _ -> assert false
 ;;
 
@@ -272,9 +273,9 @@ let decl_axioms oc ths =
     let xs = frees t in
     let rmap = renaming_map xs in
     let tvs = type_vars_in_term t in
-    out oc "def axiom_%d : %a%aPrf %a.\n"
-      i (list (decl_typ_param tvs)) tvs
-      (list (decl_param tvs rmap)) xs (term tvs rmap) t
+    out oc "def axiom_%d : %a%aPrf %a.\n" i
+      (list (decl_typ_param tvs)) tvs  (list (decl_param tvs rmap)) xs
+      (term tvs rmap) t
   in
   List.iteri axiom ths
 ;;
@@ -293,23 +294,23 @@ injective Prf : El bool -> Type.
 
 (; HOL-Light axioms and rules ;)
 el : a : Set -> El a.
-{|=|} : a : Set -> El a -> El a -> El bool.
+eq : a : Set -> El a -> El a -> El bool.
 def fun_ext : a : Set -> b : Set -> f : El (fun a b) -> g : El (fun a b) ->
-  (x : El a -> Prf ({|=|} b (f x) (g x))) -> Prf ({|=|} (fun a b) f g).
+  (x : El a -> Prf (eq b (f x) (g x))) -> Prf (eq (fun a b) f g).
 def prop_ext : p : El bool -> q : El bool ->
-  (Prf p -> Prf q) -> (Prf q -> Prf p) -> Prf ({|=|} bool p q).
-def REFL : a : Set -> t : El a -> Prf ({|=|} a t t).
+  (Prf p -> Prf q) -> (Prf q -> Prf p) -> Prf (eq bool p q).
+def REFL : a : Set -> t : El a -> Prf (eq a t t).
 def MK_COMB : a : Set -> b : Set -> s : El (fun a b) -> t : El (fun a b) ->
-  u : El a -> v : El a -> Prf({|=|} (fun a b) s t) -> Prf({|=|} a u v) ->
-  Prf ({|=|} b (s u) (t v)).
-def EQ_MP : p : El bool -> q : El bool -> Prf({|=|} bool p q) -> Prf p -> Prf q.
+  u : El a -> v : El a -> Prf(eq (fun a b) s t) -> Prf(eq a u v) ->
+  Prf (eq b (s u) (t v)).
+def EQ_MP : p : El bool -> q : El bool -> Prf(eq bool p q) -> Prf p -> Prf q.
 thm TRANS : a : Set -> x : El a -> y : El a -> z : El a ->
-  Prf ({|=|} a x y) -> Prf ({|=|} a y z) -> Prf ({|=|} a x z) :=
+  Prf (eq a x y) -> Prf (eq a y z) -> Prf (eq a x z) :=
   a: Set => x: El a => y: El a => z: El a =>
-  xy: Prf ({|=|} a x y) => yz: Prf ({|=|} a y z) =>
-  EQ_MP ({|=|} a x y) ({|=|} a x z)
-    (MK_COMB a bool ({|=|} a x) ({|=|} a x) y z
-       (REFL (fun a bool) ({|=|} a x)) yz) xy.
+  xy: Prf (eq a x y) => yz: Prf (eq a y z) =>
+  EQ_MP (eq a x y) (eq a x z)
+    (MK_COMB a bool (eq a x) (eq a x) y z
+       (REFL (fun a bool) (eq a x)) yz) xy.
 ";;
 
 let theory oc =
