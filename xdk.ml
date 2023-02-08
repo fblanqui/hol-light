@@ -42,6 +42,8 @@ let rec raw_typ oc b =
   | Tyapp(c,bs) -> out oc "(%a%a)" name c (list_prefix " " raw_typ) bs
 ;;
 
+(* [typ tvs oc b] prints on [oc] the type [b]. Type variables not in
+   [tvs] are replaced by [bool]. *)
 let typ tvs =
   let rec typ oc b =
     match b with
@@ -58,12 +60,14 @@ let raw_var oc t =
   | _ -> assert false
 ;;
 
+(* [var rmap oc t] prints on [oc] the variable [t] using the renaming
+   map [rmap]. *)
 let var rmap oc t =
   try name oc (List.assoc t rmap)
-  with Not_found ->
-    match t with
+  with Not_found -> assert false
+    (*match t with
     | Var(n,_) -> out oc "%a (;not found;)" name n
-    | _ -> assert false
+    | _ -> assert false*)
 ;;
 
 let decl_var tvs rmap oc t =
@@ -76,6 +80,9 @@ let decl_param tvs rmap oc v = out oc "%a -> " (decl_var tvs rmap) v;;
 
 let param tvs rmap oc v = out oc "%a => " (decl_var tvs rmap) v;;
 
+(* [term tvs rmap oc t] prints on [oc] the term [t] with type
+   variables [tvs] and term variable renaming map [rmap]. A variable
+   of type b not in [rmap] is replaced by [el b]. *)
 let term tvs =
   let typ = typ tvs in
   let rec term rmap oc t =
@@ -112,7 +119,11 @@ let subst_term tvs rmap =
 (* Proof translation. *)
 (****************************************************************************)
 
-(* Printing on the output channel [oc] of the subproof [i2] given:
+(* In a theorem, the hypotheses [t1;..;tn] are given the names
+   ["h1";..;"hn"]. *)
+
+(* Printing on the output channel [oc] of the subproof [p2] of index
+   [i2] given:
 - tvs: list of type variables of the theorem
 - rmap: renaming map for term variables
 - ty_su: type substitution that needs to be applied
@@ -158,8 +169,8 @@ let subproof tvs rmap ty_su tm_su ts1 i2 oc p2 =
     (list_prefix " " term) vs2 (list_prefix " " hyp) ts2
 ;;
 
-(* In a theorem, the hypotheses [t1;..;tn] are given the names
-   ["v1";..;"vn"]. *)
+(* [proof tvs rmap oc p] prints on [oc] the proof [p] for a theorem
+   with type variables [tvs] and free variables renaming map [rmap]. *)
 let proof tvs rmap =
   let typ = typ tvs in
   let term = term tvs rmap in

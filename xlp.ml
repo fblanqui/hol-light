@@ -52,6 +52,9 @@ let decl_var rmap oc t =
 
 let decl_param rmap oc v = out oc " (%a)" (decl_var rmap) v;;
 
+(* [term rmap oc t] prints on [oc] the term [t] with term variable
+   renaming map [rmap]. A variable of type b not in [rmap] is replaced
+   by [el b]. *)
 let rec term rmap oc t =
   match t with
   | Var(n,b) ->
@@ -137,6 +140,8 @@ let subproof tvs rmap ty_su tm_su ts1 i2 oc p2 =
        (list_prefix " " term) vs2 (list_prefix " " hyp) ts2
 ;;
 
+(* [proof tvs rmap oc p] prints on [oc] the proof [p] for a theorem
+   with type variables [tvs] and free variables renaming map [rmap]. *)
 let proof tvs rmap =
   let term = term rmap in
   let rec proof oc p =
