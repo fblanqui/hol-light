@@ -23,22 +23,22 @@ module type Hol_kernel =
 
       type thm
 
-      type proof = private
-        Proof of (int * thm * proof_content)
-      and proof_content = private
+      type proof_content = private
         Prefl of term
-      | Ptrans of proof * proof
-      | Pmkcomb of proof * proof
-      | Pabs of proof * term
+      | Ptrans of int * int
+      | Pmkcomb of int * int
+      | Pabs of int * term
       | Pbeta of term
       | Passume of term
-      | Peqmp of proof * proof
-      | Pdeduct of proof * proof
-      | Pinst of proof * (term * term) list
-      | Pinstt of proof * (hol_type * hol_type) list
+      | Peqmp of int * int
+      | Pdeduct of int * int
+      | Pinst of int * (term * term) list
+      | Pinstt of int * (hol_type * hol_type) list
       | Paxiom of term
       | Pdef of term * string * hol_type
-      | Pdeft of proof * term * string * hol_type
+      | Pdeft of int * term * string * hol_type
+
+      type proof = private Proof of (thm * proof_content)
 
       val types: unit -> (string * int)list
       val get_type_arity : string -> int
@@ -130,25 +130,26 @@ module Hol : Hol_kernel = struct
 (*---------------------------------------------------------------------------*)
 (* Proof tracing implementation and storage.                                 *)
 (*---------------------------------------------------------------------------*)
-  type proof =
-    Proof of (int * thm * proof_content)
-  and proof_content =
+
+  type proof_content =
     Prefl of term
-  | Ptrans of proof * proof
-  | Pmkcomb of proof * proof
-  | Pabs of proof * term
+  | Ptrans of int * int
+  | Pmkcomb of int * int
+  | Pabs of int * term
   | Pbeta of term
   | Passume of term
-  | Peqmp of proof * proof
-  | Pdeduct of proof * proof
-  | Pinst of proof * (term * term) list
-  | Pinstt of proof * (hol_type * hol_type) list
+  | Peqmp of int * int
+  | Pdeduct of int * int
+  | Pinst of int * (term * term) list
+  | Pinstt of int * (hol_type * hol_type) list
   | Paxiom of term
   | Pdef of term * string * hol_type
-  | Pdeft of proof * term * string * hol_type
+  | Pdeft of int * term * string * hol_type
+
+  type proof = Proof of (thm * proof_content)
 
   let dummy_term = Var("",Tyvar"")
-  let dummy_proof = Proof(-1,Sequent([],dummy_term,-1),Prefl dummy_term)
+  let dummy_proof = Proof(Sequent([],dummy_term,-1),Prefl dummy_term)
 
   let the_proofs_max = 1000000
   let the_proofs = Array.make the_proofs_max dummy_proof
@@ -160,9 +161,8 @@ module Hol : Hol_kernel = struct
     (if idx >= the_proofs_max then failwith "proof array size too small";
     the_proofs_idx := idx; idx)
 
-  let new_proof pr =
-    let Proof(idx,thm,content) = pr in
-    (Array.set the_proofs idx pr; thm)
+  let new_proof idx thm content =
+    (Array.set the_proofs idx (Proof(thm,content)); thm)
 
   let proof_at k = Array.get the_proofs k
 
@@ -566,7 +566,7 @@ module Hol : Hol_kernel = struct
   let REFL tm =
     let idx = next_proof_idx() in
     let th = Sequent([],safe_mk_eq tm tm,idx) in
-    new_proof (Proof(idx,th,Prefl tm))
+    new_proof idx th (Prefl tm)
 
   let TRANS (Sequent(asl1,c1,p1)) (Sequent(asl2,c2,p2)) =
     match (c1,c2) with
@@ -574,8 +574,7 @@ module Hol : Hol_kernel = struct
         when alphaorder m1 m2 = 0 ->
           let idx = next_proof_idx() in
           let th = Sequent(term_union asl1 asl2,Comb(eql,r),idx) in
-          new_proof (Proof(idx,th,Ptrans(proof_at p1,
-                                         proof_at p2)))
+          new_proof idx th (Ptrans(p1, p2))
     | _ -> failwith "TRANS"
 
 (* ------------------------------------------------------------------------- *)
@@ -591,8 +590,7 @@ module Hol : Hol_kernel = struct
              let th = Sequent(term_union asl1 asl2,
                               safe_mk_eq (Comb(l1,l2)) (Comb(r1,r2)),
                               idx) in
-             new_proof (Proof(idx,th,Pmkcomb(proof_at p1,
-                                             proof_at p2)))
+             new_proof idx th (Pmkcomb(p1, p2))
          | _ -> failwith "MK_COMB: types do not agree")
      | _ -> failwith "MK_COMB: not both equations"
 
@@ -601,7 +599,7 @@ module Hol : Hol_kernel = struct
       Var(_,_),Comb(Comb(Const("=",_),l),r) when not(exists (vfree_in v) asl) ->
         let idx = next_proof_idx() in
         let th = Sequent(asl,safe_mk_eq (Abs(v,l)) (Abs(v,r)),idx) in
-        new_proof (Proof(idx,th,Pabs(proof_at p, v)))
+        new_proof idx th (Pabs(p, v))
     | _ -> failwith "ABS";;
 
 (* ------------------------------------------------------------------------- *)
@@ -613,7 +611,7 @@ module Hol : Hol_kernel = struct
       Comb(Abs(v,bod),arg) when Pervasives.compare arg v = 0 ->
         let idx = next_proof_idx() in
         let th = Sequent([],safe_mk_eq tm bod,idx) in
-        new_proof (Proof(idx,th,Pbeta(tm)))
+        new_proof idx th (Pbeta tm)
     | _ -> failwith "BETA: not a trivial beta-redex"
 
 (* ------------------------------------------------------------------------- *)
@@ -624,7 +622,7 @@ module Hol : Hol_kernel = struct
     if Pervasives.compare (type_of tm) bool_ty = 0 then
       let idx = next_proof_idx() in
       let th = Sequent([tm],tm,idx) in
-      new_proof (Proof(idx,th,Passume(tm)))
+      new_proof idx th (Passume tm)
     else failwith "ASSUME: not a proposition"
 
   let EQ_MP (Sequent(asl1,eq,p1)) (Sequent(asl2,c,p2)) =
@@ -632,16 +630,14 @@ module Hol : Hol_kernel = struct
       Comb(Comb(Const("=",_),l),r) when alphaorder l c = 0 ->
         let idx = next_proof_idx() in
         let th = Sequent(term_union asl1 asl2,r,idx) in
-        new_proof (Proof(idx,th,Peqmp(proof_at p1,
-                                      proof_at p2)))
+        new_proof idx th (Peqmp(p1, p2))
     | _ -> failwith "EQ_MP"
 
   let DEDUCT_ANTISYM_RULE (Sequent(asl1,c1,p1)) (Sequent(asl2,c2,p2)) =
     let asl1' = term_remove c2 asl1 and asl2' = term_remove c1 asl2 in
     let idx = next_proof_idx() in
     let th = Sequent(term_union asl1' asl2',safe_mk_eq c1 c2,idx) in
-    new_proof (Proof(idx,th,Pdeduct(proof_at p1,
-                                    proof_at p2)))
+    new_proof idx th (Pdeduct(p1, p2))
 
 (* ------------------------------------------------------------------------- *)
 (* Type and term instantiation.                                              *)
@@ -651,13 +647,13 @@ module Hol : Hol_kernel = struct
     let idx = next_proof_idx() in
     let inst_fn = inst theta in
     let th = Sequent(term_image inst_fn asl,inst_fn c,idx) in
-    new_proof (Proof(idx,th,Pinstt(proof_at p,theta)))
+    new_proof idx th (Pinstt(p,theta))
 
   let INST theta (Sequent(asl,c,p)) =
     let idx = next_proof_idx() in
     let inst_fun = vsubst theta in
     let th = Sequent(term_image inst_fun asl,inst_fun c,idx) in
-    new_proof (Proof(idx,th,Pinst(proof_at p,theta)))
+    new_proof idx th (Pinst(p,theta))
 
 (* ------------------------------------------------------------------------- *)
 (* Handling of axioms.                                                       *)
@@ -672,7 +668,7 @@ module Hol : Hol_kernel = struct
       let idx = next_proof_idx() in
       let th = Sequent([],tm,idx) in
        (the_axioms := th::(!the_axioms);
-        new_proof (Proof(idx,th,Paxiom(tm))))
+        new_proof idx th (Paxiom tm))
     else failwith "new_axiom: Not a proposition"
 
 (* ------------------------------------------------------------------------- *)
@@ -696,7 +692,7 @@ module Hol : Hol_kernel = struct
              let dtm = safe_mk_eq c r in
              let dth = Sequent([],dtm,idx) in
              (the_definitions := dth::(!the_definitions);
-              new_proof (Proof(idx,dth,Pdef(dtm,cname,ty))))
+              new_proof idx dth (Pdef(dtm,cname,ty)))
     | _ -> failwith "new_basic_definition"
 
 (* ------------------------------------------------------------------------- *)
@@ -741,12 +737,8 @@ module Hol : Hol_kernel = struct
     let rth = Sequent([],rtm,ridx) in
     let _ = new_axiom atm in
     let _ = new_axiom rtm in
-    (new_proof (Proof(aidx,
-                      ath,
-                      Pdeft(proof_at p,atm,absname,absty))),
-     new_proof (Proof(ridx,
-                      rth,
-                      Pdeft(proof_at p,rtm,repname,repty))))
+    (new_proof aidx ath (Pdeft(p,atm,absname,absty)),
+     new_proof ridx rth (Pdeft(p,rtm,repname,repty)))
 
 end;;
 

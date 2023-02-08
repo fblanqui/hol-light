@@ -145,11 +145,12 @@ Experiments:
 ------------
 
 On `hol.ml` until `arith.ml` (by commenting from `loads "wf.ml"` to the end):
-- ocaml proof checking and recording: 12s
+- ocaml proof checking: 12.5s
+- ocaml proof checking and recording: 13.2s
 - dk file generation: 1m33s, 360 Mo
 - checking time with dk check: 1m12s
 - checking time with kocheck -j 7: 50s
-- lp file generation: 57s, 217 Mo
+- lp file generation: 59s, 217 Mo
 - checking time with lambdapi: 5m46s
 
 Remark: for the current version of kocheck to work, you need to

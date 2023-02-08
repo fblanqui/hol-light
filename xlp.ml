@@ -84,15 +84,18 @@ let subst_term rmap =
 (* Proof translation. *)
 (****************************************************************************)
 
+(* In a theorem, the hypotheses [t1;..;tn] are given the names
+   ["h1";..;"hn"]. *)
+
 (* Printing on the output channel [oc] of the subproof [p2] given:
 - tvs: list of type variables of the theorem
 - rmap: renaming map for term variables
 - ty_su: type substitution that needs to be applied
 - tm_su: term substitution that needs to be applied
 - ts1: hypotheses of the theorem *)
-let subproof tvs rmap ty_su tm_su ts1 oc p2 =
+let subproof tvs rmap ty_su tm_su ts1 i2 oc p2 =
   let term = term rmap in
-  let Proof(i2,th2,_) = p2 in
+  let Proof(th2,_) = p2 in
   let ts2,t2 = dest_thm th2 in
   (* vs2 is the list of free term variables of th2 *)
   let vs2 = freesl (t2::ts2) in
@@ -134,53 +137,55 @@ let subproof tvs rmap ty_su tm_su ts1 oc p2 =
        (list_prefix " " term) vs2 (list_prefix " " hyp) ts2
 ;;
 
-(* In a theorem, the hypotheses [t1;..;tn] are given the names
-   ["v1";..;"vn"]. *)
 let proof tvs rmap =
   let term = term rmap in
   let rec proof oc p =
-    let Proof(_,thm,content) = p in
+    let Proof(thm,content) = p in
     let ts = hyp thm in
     let sub = subproof tvs rmap [] [] ts in
     match content with
     | Prefl(t) ->
        out oc "REFL %a" term t
-    | Ptrans(p1,p2) ->
-       out oc "TRANS %a %a" sub p1 sub p2
-    | Pmkcomb(p1,p2) ->
-       out oc "MK_COMB %a %a" sub p1 sub p2
-    | Pabs(p,t) ->
+    | Ptrans(k1,k2) ->
+       let p1 = proof_at k1 and p2 = proof_at k2 in
+       out oc "TRANS %a %a" (sub k1) p1 (sub k2) p2
+    | Pmkcomb(k1,k2) ->
+       let p1 = proof_at k1 and p2 = proof_at k2 in
+       out oc "MK_COMB %a %a" (sub k1) p1 (sub k2) p2
+    | Pabs(k,t) ->
        let rmap' = add_var rmap t in
        out oc "fun_ext (λ %a, %a)" (decl_var rmap') t
-         (subproof tvs rmap' [] [] ts) p
+         (subproof tvs rmap' [] [] ts k) (proof_at k)
     | Pbeta(Comb(Abs(x,t),y)) when x = y ->
        out oc "REFL %a" term t
     | Pbeta(t) ->
        out oc "REFL %a" term t
     | Passume(t) ->
        out oc "h%d" (1 + index t (hyp thm))
-    | Peqmp(p1,p2) ->
-       out oc "EQ_MP %a %a" sub p1 sub p2
-    | Pdeduct(p1,p2) ->
-       let Proof(_,th1,_) = p1 and Proof(_,th2,_) = p2 in
+    | Peqmp(k1,k2) ->
+       let p1 = proof_at k1 and p2 = proof_at k2 in
+       out oc "EQ_MP %a %a" (sub k1) p1 (sub k2) p2
+    | Pdeduct(k1,k2) ->
+       let p1 = proof_at k1 and p2 = proof_at k2 in
+       let Proof(th1,_) = p1 and Proof(th2,_) = p2 in
        let t1 = concl th1 and t2 = concl th2 in
        let n = 1 + List.length ts in
        out oc "prop_ext (λ h%d : Prf %a, %a) (λ h%d : Prf %a, %a)"
-         n term t1 (subproof tvs rmap [] [] (ts @ [t1])) p2
-         n term t2 (subproof tvs rmap [] [] (ts @ [t2])) p1
-    | Pinst(p,[]) -> proof oc p
-    | Pinst(p,s) ->
-       out oc "%a" (subproof tvs rmap [] s ts) p
-    | Pinstt(p,[]) -> proof oc p
-    | Pinstt(p,s) ->
-       out oc "%a" (subproof tvs rmap s [] ts) p
+         n term t1 (subproof tvs rmap [] [] (ts @ [t1]) k2) p2
+         n term t2 (subproof tvs rmap [] [] (ts @ [t2]) k1) p1
+    | Pinst(k,[]) -> proof oc (proof_at k)
+    | Pinst(k,s) ->
+       out oc "%a" (subproof tvs rmap [] s ts k) (proof_at k)
+    | Pinstt(k,[]) -> proof oc (proof_at k)
+    | Pinstt(k,s) ->
+       out oc "%a" (subproof tvs rmap s [] ts k) (proof_at k)
     | Paxiom(t) ->
        out oc "axiom_%d%a"
          (pos_first (fun th -> concl th = t) (axioms()))
          (list_prefix " " term) (frees t)
     | Pdef(_,n,_) ->
        out oc "%a_def" name n
-    | Pdeft(p,t,n,b) ->
+    | Pdeft(_,t,_,_) ->
        out oc "axiom_%d%a"
          (pos_first (fun th -> concl th = t) (axioms()))
          (list_prefix " " term) (frees t)
@@ -283,7 +288,7 @@ let theory oc =
 
 (* [theorem oc k p] outputs on [oc] the proof [p] of index [k]. *)
 let theorem oc k p =
-  let Proof(_,thm,content) = p in
+  let Proof(thm,content) = p in
   (*log "theorem %d ...\n%!" k;*)
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
@@ -301,7 +306,7 @@ let theorem oc k p =
 (* [theorem_as_axiom oc k p] outputs on [oc] the proof [p] of index
    [k] as an axiom. *)
 let theorem_as_axiom oc k p =
-  let Proof(_,thm,content) = p in
+  let Proof(thm,content) = p in
   (*log "theorem %d as axiom ...\n%!" k;*)
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
@@ -319,8 +324,7 @@ let theorem_as_axiom oc k p =
 let proofs_in_range oc = function
   | Only x ->
      let p = proof_at x in
-     let f q = let Proof(k,_,_) = q in theorem_as_axiom oc k q in
-     List.iter f (deps p);
+     List.iter (fun k -> theorem_as_axiom oc k (proof_at k)) (deps p);
      theorem oc x p(*;
      out oc
 "flag \"print_implicits\" on;
@@ -384,7 +388,7 @@ done\n" n;
     let fname = filename (string_of_int k ^ ".lp") in
     log "generate %s ...\n%!" fname;
     let oc = open_out fname in
-    let dep oc q = let Proof(k,_,_) = q in out oc " hol-light.%d" k in
+    let dep oc k = out oc " hol-light.%d" k in
     out oc "require open hol-light.prelude%a;\n" (list dep) (deps p);
     theorem oc k p;
     close_out oc

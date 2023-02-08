@@ -77,28 +77,28 @@ let head_args =
 ;;
 
 (* [get_eq_type p] returns the type [b] of the terms t and u of the
-   conclusion of a theorem of the form [= t u]. *)
+   conclusion of the proof [p] assumed of the form [= t u]. *)
 let get_eq_type p =
-  let Proof(_,th,_) = p in
+  let Proof(th,_) = p in
   match concl th with
   | Comb(Comb(Const("=",Tyapp("fun",[b;_])),_),_) -> b
   | _ -> assert false
 ;;
 
-(* [get_eq_args p] returns the terms t and u of the conclusion of a
-   theorem of the form [= t u]. *)
+(* [get_eq_args p] returns the terms t and u of the conclusion of the
+   proof [p] assumed of the form [= t u]. *)
 let get_eq_args p =
-  let Proof(_,th,_) = p in
+  let Proof(th,_) = p in
   match concl th with
   | Comb(Comb(Const("=",_),t),u) -> t,u
   | _ -> let t = mk_var("error",bool_ty) in t,t (*assert false*)
 ;;
 
 (* [get_eq_type_args p] returns the type of the terms t and u, and the
-   terms t and u, of the conclusion of a theorem of the form [= t
-   u]. *)
+   terms t and u, of the conclusion of the proof [p] assumed of the
+   form [= t u]. *)
 let get_eq_type_args p =
-  let Proof(_,th,_) = p in
+  let Proof(th,_) = p in
   match concl th with
   | Comb(Comb(Const("=",Tyapp("fun",[b;_])),t),u) -> b,t,u
   | _ -> assert false
@@ -218,9 +218,9 @@ type_vars_pos
 (* Functions on proofs. *)
 (****************************************************************************)
 
-(* [deps p] returns the list of proof index [p] depends on. *)
+(* [deps p] returns the list of proof indexes [p] depends on. *)
 let deps p =
-  let Proof(_,_,content) = p in
+  let Proof(_,content) = p in
   match content with
   | Ptrans(p1,p2) | Pmkcomb(p1,p2) | Peqmp(p1,p2) | Pdeduct(p1,p2) -> [p1;p2]
   | Pabs(p1,_) | Pinst(p1,_) | Pinstt(p1,_)| Pdeft(p1,_,_,_) -> [p1]

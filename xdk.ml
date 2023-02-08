@@ -112,16 +112,16 @@ let subst_term tvs rmap =
 (* Proof translation. *)
 (****************************************************************************)
 
-(* Printing on the output channel [oc] of the subproof [p2] given:
+(* Printing on the output channel [oc] of the subproof [i2] given:
 - tvs: list of type variables of the theorem
 - rmap: renaming map for term variables
 - ty_su: type substitution that needs to be applied
 - tm_su: term substitution that needs to be applied
 - ts1: hypotheses of the theorem *)
-let subproof tvs rmap ty_su tm_su ts1 oc p2 =
+let subproof tvs rmap ty_su tm_su ts1 i2 oc p2 =
   let typ = typ tvs in
   let term = term tvs rmap in
-  let Proof(i2,th2,_) = p2 in
+  let Proof(th2,_) = p2 in
   let ts2,t2 = dest_thm th2 in
   (* vs2 is the list of free term variables of th2 *)
   let vs2 = freesl (t2::ts2) in
@@ -164,53 +164,57 @@ let proof tvs rmap =
   let typ = typ tvs in
   let term = term tvs rmap in
   let rec proof oc p =
-    let Proof(_,thm,content) = p in
+    let Proof(thm,content) = p in
     let ts = hyp thm in
     let sub = subproof tvs rmap [] [] ts in
     match content with
     | Prefl(t) ->
        out oc "REFL %a %a" typ (get_eq_type p) term t
-    | Ptrans(p1,p2) ->
+    | Ptrans(k1,k2) ->
+       let p1 = proof_at k1 and p2 = proof_at k2 in
        let a,x,y = get_eq_type_args p1 in
        let _,z = get_eq_args p2 in
        out oc "TRANS %a %a %a %a %a %a"
-         typ (get_eq_type p1) term x term y term z sub p1 sub p2
-    | Pmkcomb(p1,p2) ->
+         typ (get_eq_type p1) term x term y term z (sub k1) p1 (sub k2) p2
+    | Pmkcomb(k1,k2) ->
+       let p1 = proof_at k1 and p2 = proof_at k2 in
        let ab,s,t = get_eq_type_args p1 in
        let a,b = match ab with Tyapp("fun",[a;b]) -> a,b | _ -> assert false in
        let u,v = get_eq_args p2 in
        out oc "MK_COMB %a %a %a %a %a %a %a %a"
-         typ a typ b term s term t term u term v sub p1 sub p2
-    | Pabs(p',t) ->
+         typ a typ b term s term t term u term v (sub k1) p1 (sub k2) p2
+    | Pabs(k,t) ->
        let ab,f,g = get_eq_type_args p in
        let a,b = match ab with Tyapp("fun",[a;b]) -> a,b | _ -> assert false in
        let rmap' = add_var rmap t in
        out oc "fun_ext %a %a %a %a (%a => %a)"
          typ a typ b term f term g (decl_var tvs rmap') t
-         (subproof tvs rmap' [] [] ts) p'
+         (subproof tvs rmap' [] [] ts k) (proof_at k)
     | Pbeta(Comb(Abs(x,t),y)) when x = y ->
        out oc "REFL %a %a" typ (type_of t) term t
     | Pbeta(t) ->
        out oc "REFL %a %a" typ (type_of t) term t
     | Passume(t) ->
        out oc "h%d" (1 + index t (hyp thm))
-    | Peqmp(p1,p2) ->
+    | Peqmp(k1,k2) ->
+       let p1 = proof_at k1 and p2 = proof_at k2 in
        let p,q = get_eq_args p1 in
-       out oc "EQ_MP %a %a %a %a" term p term q sub p1 sub p2
-    | Pdeduct(p1,p2) ->
-       let Proof(_,th1,_) = p1 and Proof(_,th2,_) = p2 in
+       out oc "EQ_MP %a %a %a %a" term p term q (sub k1) p1 (sub k2) p2
+    | Pdeduct(k1,k2) ->
+       let p1 = proof_at k1 and p2 = proof_at k2 in
+       let Proof(th1,_) = p1 and Proof(th2,_) = p2 in
        let t1 = concl th1 and t2 = concl th2 in
        let n = 1 + List.length ts in
        out oc "prop_ext %a %a (h%d : Prf %a => %a) (h%d : Prf %a => %a)"
          term t1 term t2
-         n term t1 (subproof tvs rmap [] [] (ts @ [t1])) p2
-         n term t2 (subproof tvs rmap [] [] (ts @ [t2])) p1
-    | Pinst(p,[]) -> proof oc p
-    | Pinst(p,s) ->
-       out oc "%a" (subproof tvs rmap [] s ts) p
-    | Pinstt(p,[]) -> proof oc p
-    | Pinstt(p,s) ->
-       out oc "%a" (subproof tvs rmap s [] ts) p
+         n term t1 (subproof tvs rmap [] [] (ts @ [t1]) k2) p2
+         n term t2 (subproof tvs rmap [] [] (ts @ [t2]) k1) p1
+    | Pinst(k,[]) -> proof oc (proof_at k)
+    | Pinst(k,s) ->
+       out oc "%a" (subproof tvs rmap [] s ts k) (proof_at k)
+    | Pinstt(k,[]) -> proof oc (proof_at k)
+    | Pinstt(k,s) ->
+       out oc "%a" (subproof tvs rmap s [] ts k) (proof_at k)
     | Pdef(_,n,b) ->
        let ps = const_type_vars_pos n in
        (*out oc "(;t=%a; b=%a; ps=%a;)" term t typ b type_var_pos_list ps;*)
@@ -334,7 +338,7 @@ let theory oc =
 
 (* [theorem_as_axiom oc k p] outputs on [oc] the proof [p] of index [k]. *)
 let theorem oc k p =
-  let Proof(_,thm,content) = p in
+  let Proof(thm,content) = p in
   (*log "theorem %d ...\n%!" k;*)
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
@@ -356,7 +360,7 @@ let theorem oc k p =
 (* [theorem_as_axiom oc k p] outputs on [oc] the proof [p] of index
    [k] as an axiom. *)
 let theorem_as_axiom oc k p =
-  let Proof(_,thm,content) = p in
+  let Proof(thm,content) = p in
   (*log "theorem %d as axiom ...\n%!" k;*)
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
@@ -375,8 +379,7 @@ let theorem_as_axiom oc k p =
 let proofs_in_range oc = function
   | Only x ->
      let p = proof_at x in
-     let f q = let Proof(k,_,_) = q in theorem_as_axiom oc k q in
-     List.iter f (deps p);
+     List.iter (fun k -> theorem_as_axiom oc k (proof_at k)) (deps p);
      theorem oc x p
   | Upto y -> for k = 0 to y do theorem oc k (proof_at k) done
   | All -> iter_proofs (theorem oc)
