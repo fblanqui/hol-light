@@ -145,11 +145,19 @@ Experiments:
 ------------
 
 On `hol.ml` until `arith.ml` (by commenting from `loads "wf.ml"` to the end):
-- generation time for dk: 1m52s, 395 Mo
+- ocaml proof checking and recording: 12s
+- dk file generation: 1m33s, 360 Mo
 - checking time with dk check: 1m12s
 - checking time with kocheck -j 7: 50s
-- generation time for lp: 1m08s, 217 Mo
+- lp file generation: 57s, 217 Mo
 - checking time with lambdapi: 5m46s
+
+Remark: for the current version of kocheck to work, you need to
+slightly modify the dk output as follows:
+
+```
+sed -i 's/^injective /def /g' myfile.dk
+```
 
 Implementation
 --------------
