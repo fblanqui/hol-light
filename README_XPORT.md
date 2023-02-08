@@ -77,13 +77,13 @@ update_map_const_type_vars_pos();;
 To export to Dedukti, write then:
 ```
 #use "xdk.ml";;
-export_to_dk "myfile.dk" All;;
+export_to_dk_file "myfile.dk" All;;
 ```
 
 To export to Lambdapi, write thn:
 ```
 #use "xlp.ml";;
-export_to_lp "myfile.lp" All;;
+export_to_lp_file "myfile.lp" All;;
 ```
 
 To get the list of HOL-Light files and named theorems:
@@ -146,7 +146,8 @@ Experiments:
 
 On `hol.ml` until `arith.ml` (by commenting from `loads "wf.ml"` to the end):
 - generation time for dk: 1m52s, 395 Mo
-- checking time with dk check: 1m12s 
+- checking time with dk check: 1m12s
+- checking time with kocheck -j 7: 50s
 - generation time for lp: 1m08s, 217 Mo
 - checking time with lambdapi: 5m46s
 

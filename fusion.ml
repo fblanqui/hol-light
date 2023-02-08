@@ -103,6 +103,7 @@ module type Hol_kernel =
       val new_basic_type_definition :
               string -> string * string -> thm -> thm * thm
 
+      val the_proofs : (int, proof) Hashtbl.t
       val proofs : unit -> proof list
       val proof_of : thm -> proof
       val proof_at: int -> proof

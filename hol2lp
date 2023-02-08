@@ -28,6 +28,6 @@ print_endline "------------------------------------------------------------";;
 print_endline "#use \"xlp.ml\";;";;
 #use "xlp.ml";;
 print_endline "------------------------------------------------------------";;
-print_endline "export_to_lp \"$2\" (Upto 50000);;";;
+print_endline "export_to_lp_file \"$2\" (Upto 50000);;";;
 export_to_lp "$2" (Upto 50000);;
 EOF

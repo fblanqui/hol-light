@@ -327,17 +327,15 @@ let theory oc =
 (; axioms ;)
 %a
 (; definitions ;)
-%a
-(; theorems ;)\n"
+%a\n"
     prelude (list decl_typ) types (list decl_sym) constants
     decl_axioms (axioms()) (list decl_def) (definitions())
 ;;
 
-(* [theorem_as_axiom oc k] outputs on [oc] the proof of index [k]. *)
-let theorem oc k =
+(* [theorem_as_axiom oc p] outputs on [oc] the proof [p]. *)
+let theorem oc p =
+  let Proof(k,thm,content) = p in
   (*log "theorem %d ...\n%!" k;*)
-  let p = proof_at k in
-  let Proof(_,thm,content) = p in
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
   let rmap = renaming_map xs in
@@ -355,12 +353,10 @@ let theorem oc k =
     (proof tvs rmap) p
 ;;
 
-(* [theorem_as_axiom oc k] outputs on [oc] the theorem of index [k] as
-   an axiom. *)
-let theorem_as_axiom oc k =
+(* [theorem_as_axiom oc p] outputs on [oc] the proof [p] as an axiom. *)
+let theorem_as_axiom oc p =
+  let Proof(k,thm,content) = p in
   (*log "theorem %d as axiom ...\n%!" k;*)
-  let p = proof_at k in
-  let Proof(_,thm,content) = p in
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
   let rmap = renaming_map xs in
@@ -379,18 +375,19 @@ let proofs_in_range oc = function
   | Only x ->
      let p = proof_at x in
      List.iter (theorem_as_axiom oc) (deps p);
-     theorem oc x
-  | Upto y -> for k = 0 to y do theorem oc k done
-  | All -> List.iter (fun p -> theorem oc (index_of p)) (proofs())
+     theorem oc p
+  | Upto y -> for k = 0 to y do theorem oc (proof_at k) done
+  | All -> List.iter (theorem oc) (proofs())
 ;;
 
-(* [export_to_lp f r] creates a file of name [f] and outputs to this
+(* [export_to_dk_file f r] creates a file of name [f] and outputs to this
    file the proofs in range [r]. *)
-let export_to_dk filename r =
+let export_to_dk_file filename r =
   print_time();
   log "generate %s ...\n%!" filename;
   let oc = open_out filename in
   theory oc;
+  out oc "(; theorems ;)\n";
   proofs_in_range oc r;
   close_out oc;
   print_time()

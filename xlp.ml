@@ -276,17 +276,15 @@ let theory oc =
 /* axioms */
 %a
 /* definitions */
-%a
-/* theorems */\n"
+%a\n"
     prelude (list decl_typ) types (list decl_sym) constants
     decl_axioms (axioms()) (list decl_def) (definitions())
 ;;
 
-(* [theorem oc k] outputs on [oc] the theorem of index [k]. *)
-let theorem oc k =
+(* [theorem oc p] outputs on [oc] the proof [p]. *)
+let theorem oc p =
+  let Proof(k,thm,content) = p in
   (*log "theorem %d ...\n%!" k;*)
-  let p = proof_at k in
-  let Proof(_,thm,content) = p in
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
   let rmap = renaming_map xs in
@@ -300,12 +298,10 @@ let theorem oc k =
     (proof tvs rmap) p
 ;;
 
-(* [theorem_as_axiom oc k] outputs on [oc] the theorem of index [k] as
-   an axiom. *)
-let theorem_as_axiom oc k =
+(* [theorem_as_axiom oc k] outputs on [oc] the proof [p] as an axiom. *)
+let theorem_as_axiom oc p =
+  let Proof(k,thm,content) = p in
   (*log "theorem %d as axiom ...\n%!" k;*)
-  let p = proof_at k in
-  let Proof(_,thm,content) = p in
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
   let rmap = renaming_map xs in
@@ -318,29 +314,84 @@ let theorem_as_axiom oc k =
     k typ_vars tvs (list (decl_param rmap)) xs decl_hyps ts term t
 ;;
 
-(* [proofs_in_range oc r] outputs on [oc] the theorems in range [r]. *)
+(* [proofs_in_range oc r] outputs on [oc] the proofs in range [r]. *)
 let proofs_in_range oc = function
   | Only x ->
      let p = proof_at x in
      List.iter (theorem_as_axiom oc) (deps p);
-     theorem oc x(*;
+     theorem oc p(*;
      out oc
 "flag \"print_implicits\" on;
 flag \"print_domains\" on;
 print thm_%d;\n" x*)
-  | Upto y -> for k = 0 to y do theorem oc k done
-  | All -> List.iter (fun p -> theorem oc (index_of p)) (proofs())
+  | Upto y -> for k = 0 to y do theorem oc (proof_at k) done
+  | All -> List.iter (theorem oc) (proofs())
 ;;
 
-(* [export_to_lp f r] creates a file of name [f] and outputs to this
+(* [export_to_lp_file f r] creates a file of name [f] and outputs to this
    file the proofs in range [r]. *)
-let export_to_lp filename r =
+let export_to_lp_file filename r =
   print_time();
   log "generate %s ...\n%!" filename;
   let oc = open_out filename in
   theory oc;
+  out oc "/* theorems */\n";
   proofs_in_range oc r;
   close_out oc;
+  print_time()
+;;
+
+(* [export_to_lp_dir d r] creates in directory [d] a file for each
+   proof in range [r]. *)
+let export_to_lp_dir dirname r =
+  print_time();
+  if not (Sys.is_directory dirname) then
+    failwith (Printf.sprintf "\"%s\" is not a directory\n" dirname);
+  let filename = Filename.concat dirname in
+  (* Generate the prelude with the encoding and the axioms. *)
+  let fname = filename "lambdapi.pkg" in
+  log "generate %s ...\n" fname;
+  let oc = open_out fname in
+  out oc "package_name = hol-light\nroot_path = hol-light\n";
+  close_out oc;
+  (* Generate the prelude with the encoding and the axioms. *)
+  let fname = filename "prelude.lp" in
+  log "generate %s ...\n" fname;
+  let oc = open_out fname in
+  theory oc;
+  close_out oc;
+  (* Generate shell script to check lp files. *)
+  let fname = filename "check-lp.sh" in
+  log "generate %s ...\n" fname;
+  let oc = open_out_gen [Open_wronly;Open_creat;Open_trunc] 0o755 fname in
+  let n =
+    match r with
+    | Only _ -> invalid_arg "export_to_lp_dir"
+    | Upto x -> x
+    | All -> Hashtbl.((stats the_proofs).num_bindings)
+  in
+  out oc "#!/bin/bash\n
+for i in prelude {0..%d}
+do
+  echo $i ...
+  lambdapi check -c --verbose 0 $i.lp
+done\n" n;
+  close_out oc;
+  (* Generate a lp file for each proof. *)
+  let theorem_file k p =
+    let fname = filename (string_of_int k ^ ".lp") in
+    log "generate %s ...\n%!" fname;
+    let oc = open_out fname in
+    let dep oc p = out oc " hol-light.%d" (index_of p) in
+    out oc "require open hol-light.prelude%a;\n" (list dep) (deps p);
+    theorem oc p;
+    close_out oc
+  in
+  begin match r with
+  | All -> Hashtbl.iter theorem_file the_proofs
+  | Upto x -> for k=0 to x do theorem_file k (proof_at k) done
+  | Only _ -> invalid_arg "export_to_lp_dir"
+  end;
   print_time()
 ;;
 

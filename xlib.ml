@@ -6,6 +6,12 @@ unset_jrh_lexer;;
 
 type range = Only of int | Upto of int | All;;
 
+let in_range = function
+  | Only x -> fun k -> k = x
+  | Upto x -> fun k -> k <= x
+  | All -> fun _ -> true
+;;
+
 (****************************************************************************)
 (* Functions on basic data structures. *)
 (****************************************************************************)
@@ -44,6 +50,12 @@ let list elt oc xs = list_sep "" elt oc xs;;
 let list_prefix p elt oc xs = list (prefix p elt) oc xs;;
 
 let olist elt oc xs = out oc "[%a]" (list_sep "; " elt) xs;;
+
+let hstats oc ht =
+  let open Hashtbl in let s = stats ht in
+  out oc "{ num_bindings = %d; num_buckets = %d; max_bucket_length = %d }\n"
+    s.num_bindings s.num_buckets s.max_bucket_length
+;;
 
 (****************************************************************************)
 (* Functions on types and terms. *)
@@ -213,9 +225,8 @@ let index_of proof = let Proof(k,_,_) = proof in k;;
 let deps p =
   let Proof(_,_,content) = p in
   match content with
-  | Ptrans(p1,p2) | Pmkcomb(p1,p2) | Peqmp(p1,p2) | Pdeduct(p1,p2) ->
-     [index_of p1; index_of p2]
-  | Pabs(p,_) | Pinst(p,_) | Pinstt(p,_)| Pdeft(p,_,_,_) -> [index_of p]
+  | Ptrans(p1,p2) | Pmkcomb(p1,p2) | Peqmp(p1,p2) | Pdeduct(p1,p2) -> [p1;p2]
+  | Pabs(p1,_) | Pinst(p1,_) | Pinstt(p1,_)| Pdeft(p1,_,_,_) -> [p1]
   | _ -> []
 ;;
 
