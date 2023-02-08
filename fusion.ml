@@ -104,8 +104,7 @@ module type Hol_kernel =
       val new_basic_type_definition :
               string -> string * string -> thm -> thm * thm
 
-      val the_proofs : proof array
-      val the_proofs_idx : int ref
+      val nb_proofs : unit -> int
       val proof_at: int -> proof
       val iter_proofs : (int -> proof -> unit) -> unit
 end;;
@@ -156,6 +155,8 @@ module Hol : Hol_kernel = struct
 
   let the_proofs_idx = ref (-1)
 
+  let nb_proofs() = !the_proofs_idx
+  
   let next_proof_idx() =
     let idx = !the_proofs_idx + 1 in
     (if idx >= the_proofs_max then failwith "proof array size too small";

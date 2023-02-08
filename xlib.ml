@@ -230,21 +230,21 @@ let deps p =
 (* Print some statistics on how many times a proof is used. *)
 let print_proof_stats() =
   (* Array for mapping each proof index to the number of times it is used. *)
-  let used = Array.make (!the_proofs_idx) 0 in
+  let proof_uses = Array.make (nb_proofs()) 0 in
   (* Maximum number of times a proof is used. *)
   let max = ref 0 in
-  (* Actually compute [used]. *)
+  (* Actually compute [proof_uses]. *)
   let use k =
-    let n = Array.get used k + 1 in
-    Array.set used k n;
+    let n = Array.get proof_uses k + 1 in
+    Array.set proof_uses k n;
     if n > !max then max := n
   in
-  Array.iteri (fun _ p -> List.iter use (deps p)) the_proofs;
+  iter_proofs (fun _ p -> List.iter use (deps p));
   (* Array for mapping to each number n <= !max the number of proofs which
      is used n times. *)
   let hist = Array.make (!max + 1) 0 in
   let f nb_uses = Array.set hist nb_uses (Array.get hist nb_uses + 1) in
-  Array.iter f used;
+  Array.iter f proof_uses;
   (* Print histogram *)
   log "i: n means that n proofs are used i times\n";
   let nonzeros = ref 0 in
@@ -252,7 +252,52 @@ let print_proof_stats() =
     let n = Array.get hist i in
     if n>0 then (incr nonzeros; log "%d: %d\n" i n)
   done;
-  log "number of mappings: %d\n" !nonzeros
+  log "number of mappings: %d\n" !nonzeros;
+  (* Count the number of times each proof rule is used. *)
+  let index p =
+    let Proof(_,c) = p in
+    match c with
+    | Prefl _ -> 0
+    | Ptrans _ -> 1
+    | Pmkcomb _ -> 2
+    | Pabs _ -> 3
+    | Pbeta _ -> 4
+    | Passume _ -> 5
+    | Peqmp _ -> 6
+    | Pdeduct _ -> 7
+    | Pinst _ -> 8
+    | Pinstt _ -> 9
+    | Paxiom _ -> 10
+    | Pdef _ -> 11
+    | Pdeft _ -> 12
+  in
+  let name = function
+    | 0 -> "refl"
+    | 1 -> "trans"
+    | 2 -> "comb"
+    | 3 -> "abs"
+    | 4 -> "beta"
+    | 5 -> "assume"
+    | 6 -> "eqmp"
+    | 7 -> "deduct"
+    | 8 -> "term_subst"
+    | 9 -> "type_subst"
+    | 10 -> "axiom"
+    | 11 -> "sym_def"
+    | 12 -> "type_def"
+    | _ -> assert false
+  in
+  let rule_uses = Array.make 13 0 in
+  let f k p =
+    let i = index p in
+    let n = Array.get rule_uses i + 1 in
+    Array.set rule_uses i n
+  in
+  iter_proofs f;
+  let total = float_of_int (nb_proofs()) in
+  let part n = float_of_int (100 * n) /. total in
+  let f i n = log "%10s %9d %2.f%%\n" (name i) n (part n) in
+  Array.iteri f rule_uses
 ;;
 
 (****************************************************************************)

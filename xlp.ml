@@ -379,7 +379,7 @@ let export_to_lp_dir dirname r =
     match r with
     | Only _ -> invalid_arg "export_to_lp_dir"
     | Upto x -> x
-    | All -> !the_proofs_idx
+    | All -> nb_proofs()
   in
   out oc "#!/bin/bash\n
 for i in prelude {0..%d}
