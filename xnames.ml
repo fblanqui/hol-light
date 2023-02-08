@@ -2,8 +2,6 @@
 (* Compute the theorems of each file, following ProofTrace/proofs.ml. *)
 (****************************************************************************)
 
-unset_jrh_lexer;;
-
 let PROVE_1_RE = Str.regexp (String.concat "" (
   "\\(let\\|and\\)[ \n\t]*"::
   "\\([a-zA-Z0-9_-]+\\)[ \n\t]*"::
@@ -83,7 +81,7 @@ let load_file f =
   let s = Bytes.create n in
   really_input ic s 0 n;
   close_in ic;
-  s
+  Bytes.to_string s
 ;;
 
 let theorems_of_file f =
@@ -118,10 +116,12 @@ let source_files() =
   in walk [] [Sys.getcwd()]
 ;;
 
-let files = log "compute list of files ...@."; source_files();;
+let files = log "compute list of files ...\n%!"; source_files();;
+
+unset_jrh_lexer;;
 
 let update_map_file_thms() =
-  log "compute theorem names in each file ...@.";
+  log "compute theorem names in each file ...\n%!";
   map_file_thms :=
     List.fold_left
       (fun map f -> MapStr.add f (theorems_of_file f) map)
@@ -137,14 +137,12 @@ let eval code =
   let parsed = !Toploop.parse_toplevel_phrase as_buf in
   ignore (Toploop.execute_phrase true Format.std_formatter parsed)
 
-let idx = ref 0;;
+let idx = ref (-1);;
 
-let cmd_set_idx name =
-  Printf.sprintf "idx := index_of (proof_of %s);;" name
-;;
+let cmd_set_idx name = Printf.sprintf "idx := index_of %s;;" name;;
 
 let update_map_thm_id_name() =
-  log "compute map id -> theorem ...";
+  log "compute map id -> theorem ...\n%!";
   map_thm_id_name :=
     MapStr.fold
       (fun filename thm_names map ->
@@ -161,6 +159,6 @@ let update_map_thm_id_name() =
 ;;
 
 let print_map_thm_id_name() =
-  MapInt.iter (fun k name -> log "%d %s@." k name) !map_thm_id_name;;
+  MapInt.iter (fun k name -> log "%d %s\n" k name) !map_thm_id_name;;
 
 set_jrh_lexer;;

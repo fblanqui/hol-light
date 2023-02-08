@@ -332,9 +332,9 @@ let theory oc =
     decl_axioms (axioms()) (list decl_def) (definitions())
 ;;
 
-(* [theorem_as_axiom oc p] outputs on [oc] the proof [p]. *)
-let theorem oc p =
-  let Proof(k,thm,content) = p in
+(* [theorem_as_axiom oc k p] outputs on [oc] the proof [p] of index [k]. *)
+let theorem oc k p =
+  let Proof(_,thm,content) = p in
   (*log "theorem %d ...\n%!" k;*)
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
@@ -353,9 +353,10 @@ let theorem oc p =
     (proof tvs rmap) p
 ;;
 
-(* [theorem_as_axiom oc p] outputs on [oc] the proof [p] as an axiom. *)
-let theorem_as_axiom oc p =
-  let Proof(k,thm,content) = p in
+(* [theorem_as_axiom oc k p] outputs on [oc] the proof [p] of index
+   [k] as an axiom. *)
+let theorem_as_axiom oc k p =
+  let Proof(_,thm,content) = p in
   (*log "theorem %d as axiom ...\n%!" k;*)
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
@@ -374,10 +375,11 @@ let theorem_as_axiom oc p =
 let proofs_in_range oc = function
   | Only x ->
      let p = proof_at x in
-     List.iter (theorem_as_axiom oc) (deps p);
-     theorem oc p
-  | Upto y -> for k = 0 to y do theorem oc (proof_at k) done
-  | All -> List.iter (theorem oc) (proofs())
+     let f q = let Proof(k,_,_) = q in theorem_as_axiom oc k q in
+     List.iter f (deps p);
+     theorem oc x p
+  | Upto y -> for k = 0 to y do theorem oc k (proof_at k) done
+  | All -> iter_proofs (theorem oc)
 ;;
 
 (* [export_to_dk_file f r] creates a file of name [f] and outputs to this

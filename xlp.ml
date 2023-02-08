@@ -281,9 +281,9 @@ let theory oc =
     decl_axioms (axioms()) (list decl_def) (definitions())
 ;;
 
-(* [theorem oc p] outputs on [oc] the proof [p]. *)
-let theorem oc p =
-  let Proof(k,thm,content) = p in
+(* [theorem oc k p] outputs on [oc] the proof [p] of index [k]. *)
+let theorem oc k p =
+  let Proof(_,thm,content) = p in
   (*log "theorem %d ...\n%!" k;*)
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
@@ -298,9 +298,10 @@ let theorem oc p =
     (proof tvs rmap) p
 ;;
 
-(* [theorem_as_axiom oc k] outputs on [oc] the proof [p] as an axiom. *)
-let theorem_as_axiom oc p =
-  let Proof(k,thm,content) = p in
+(* [theorem_as_axiom oc k p] outputs on [oc] the proof [p] of index
+   [k] as an axiom. *)
+let theorem_as_axiom oc k p =
+  let Proof(_,thm,content) = p in
   (*log "theorem %d as axiom ...\n%!" k;*)
   let ts,t = dest_thm thm in
   let xs = freesl (t::ts) in
@@ -318,14 +319,15 @@ let theorem_as_axiom oc p =
 let proofs_in_range oc = function
   | Only x ->
      let p = proof_at x in
-     List.iter (theorem_as_axiom oc) (deps p);
-     theorem oc p(*;
+     let f q = let Proof(k,_,_) = q in theorem_as_axiom oc k q in
+     List.iter f (deps p);
+     theorem oc x p(*;
      out oc
 "flag \"print_implicits\" on;
 flag \"print_domains\" on;
 print thm_%d;\n" x*)
-  | Upto y -> for k = 0 to y do theorem oc (proof_at k) done
-  | All -> List.iter (theorem oc) (proofs())
+  | Upto y -> for k = 0 to y do theorem oc k (proof_at k) done
+  | All -> iter_proofs (theorem oc)
 ;;
 
 (* [export_to_lp_file f r] creates a file of name [f] and outputs to this
@@ -368,7 +370,7 @@ let export_to_lp_dir dirname r =
     match r with
     | Only _ -> invalid_arg "export_to_lp_dir"
     | Upto x -> x
-    | All -> Hashtbl.((stats the_proofs).num_bindings)
+    | All -> !the_proofs_idx
   in
   out oc "#!/bin/bash\n
 for i in prelude {0..%d}
@@ -382,13 +384,13 @@ done\n" n;
     let fname = filename (string_of_int k ^ ".lp") in
     log "generate %s ...\n%!" fname;
     let oc = open_out fname in
-    let dep oc p = out oc " hol-light.%d" (index_of p) in
+    let dep oc q = let Proof(k,_,_) = q in out oc " hol-light.%d" k in
     out oc "require open hol-light.prelude%a;\n" (list dep) (deps p);
-    theorem oc p;
+    theorem oc k p;
     close_out oc
   in
   begin match r with
-  | All -> Hashtbl.iter theorem_file the_proofs
+  | All -> iter_proofs theorem_file
   | Upto x -> for k=0 to x do theorem_file k (proof_at k) done
   | Only _ -> invalid_arg "export_to_lp_dir"
   end;

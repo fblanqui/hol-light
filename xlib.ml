@@ -218,9 +218,6 @@ type_vars_pos
 (* Functions on proofs. *)
 (****************************************************************************)
 
-(* [index_of p] returns the index of the proof [p]. *)
-let index_of proof = let Proof(k,_,_) = proof in k;;
-
 (* [deps p] returns the list of proof index [p] depends on. *)
 let deps p =
   let Proof(_,_,content) = p in

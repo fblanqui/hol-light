@@ -86,6 +86,7 @@ module type Hol_kernel =
       val dest_thm : thm -> term list * term
       val hyp : thm -> term list
       val concl : thm -> term
+      val index_of : thm -> int
       val REFL : term -> thm
       val TRANS : thm -> thm -> thm
       val MK_COMB : thm * thm -> thm
@@ -103,10 +104,10 @@ module type Hol_kernel =
       val new_basic_type_definition :
               string -> string * string -> thm -> thm * thm
 
-      val the_proofs : (int, proof) Hashtbl.t
-      val proofs : unit -> proof list
-      val proof_of : thm -> proof
+      val the_proofs : proof array
+      val the_proofs_idx : int ref
       val proof_at: int -> proof
+      val iter_proofs : (int -> proof -> unit) -> unit
 end;;
 
 (* ------------------------------------------------------------------------- *)
@@ -146,26 +147,27 @@ module Hol : Hol_kernel = struct
   | Pdef of term * string * hol_type
   | Pdeft of proof * term * string * hol_type
 
-  let the_proofs = Hashtbl.create 500000
+  let dummy_term = Var("",Tyvar"")
+  let dummy_proof = Proof(-1,Sequent([],dummy_term,-1),Prefl dummy_term)
+
+  let the_proofs_max = 1000000
+  let the_proofs = Array.make the_proofs_max dummy_proof
+
   let the_proofs_idx = ref (-1)
-
-  let the_proofs_idx_comp p1 p2 =
-    let (Proof(i1,_,_),Proof(i2,_,_)) = (p1,p2) in (i1 - i2)
-
-  let proofs() =
-    List.sort the_proofs_idx_comp
-              (Hashtbl.fold (fun idx pr acc -> pr :: acc) the_proofs [])
 
   let next_proof_idx() =
     let idx = !the_proofs_idx + 1 in
-    (the_proofs_idx := idx; idx)
+    (if idx >= the_proofs_max then failwith "proof array size too small";
+    the_proofs_idx := idx; idx)
 
   let new_proof pr =
     let Proof(idx,thm,content) = pr in
-    (Hashtbl.add the_proofs idx pr; thm)
+    (Array.set the_proofs idx pr; thm)
 
-  let proof_at p =
-    try Hashtbl.find the_proofs p with Not_found -> assert false
+  let proof_at k = Array.get the_proofs k
+
+  let iter_proofs f =
+    for k = 0 to !the_proofs_idx do f k (proof_at k) done
 
 (* ------------------------------------------------------------------------- *)
 (* List of current type constants with their arities.                        *)
@@ -555,7 +557,7 @@ module Hol : Hol_kernel = struct
 
   let concl (Sequent(asl,c,_)) = c
 
-  let proof_of(Sequent(_,_,p)) = proof_at p
+  let index_of(Sequent(_,_,k)) = k
 
 (* ------------------------------------------------------------------------- *)
 (* Basic equality properties; TRANS is derivable but included for efficiency *)
