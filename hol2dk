@@ -29,5 +29,5 @@ print_endline "#use \"xdk.ml\";;";;
 #use "xdk.ml";;
 print_endline "------------------------------------------------------------";;
 print_endline "export_to_dk_file \"$2\" All;;";;
-export_to_dk "$2" All;;
+export_to_dk_file "$2" All;;
 EOF
