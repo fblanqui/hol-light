@@ -252,7 +252,7 @@ let print_proof_stats() =
     let n = Array.get hist i in
     if n>0 then (incr nonzeros; log "%d: %d\n" i n)
   done;
-  log "nonzeros = %d\n" !nonzeros
+  log "number of mappings: %d\n" !nonzeros
 ;;
 
 (****************************************************************************)
