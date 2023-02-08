@@ -86,6 +86,11 @@ To export to Lambdapi, write thn:
 export_to_lp_file "myfile.lp" All;;
 ```
 
+To get some statistics on proofs:
+```
+print_proof_stats();;
+```
+
 To get the list of HOL-Light files and named theorems:
 ```
 #use "xnames.ml";;
