@@ -218,13 +218,41 @@ type_vars_pos
 (* Functions on proofs. *)
 (****************************************************************************)
 
-(* [deps p] returns the list of proof indexes [p] depends on. *)
+(* [deps p] returns the list of proof indexes the proof [p] depends on. *)
 let deps p =
   let Proof(_,content) = p in
   match content with
   | Ptrans(p1,p2) | Pmkcomb(p1,p2) | Peqmp(p1,p2) | Pdeduct(p1,p2) -> [p1;p2]
   | Pabs(p1,_) | Pinst(p1,_) | Pinstt(p1,_)| Pdeft(p1,_,_,_) -> [p1]
   | _ -> []
+;;
+
+(* Print some statistics on how many times a proof is used. *)
+let print_proof_stats() =
+  (* Array for mapping each proof index to the number of times it is used. *)
+  let used = Array.make (!the_proofs_idx) 0 in
+  (* Maximum number of times a proof is used. *)
+  let max = ref 0 in
+  (* Actually compute [used]. *)
+  let use k =
+    let n = Array.get used k + 1 in
+    Array.set used k n;
+    if n > !max then max := n
+  in
+  Array.iteri (fun _ p -> List.iter use (deps p)) the_proofs;
+  (* Array for mapping to each number n <= !max the number of proofs which
+     is used n times. *)
+  let hist = Array.make (!max + 1) 0 in
+  let f nb_uses = Array.set hist nb_uses (Array.get hist nb_uses + 1) in
+  Array.iter f used;
+  (* Print histogram *)
+  log "i: n means that n proofs are used i times\n";
+  let nonzeros = ref 0 in
+  for i=0 to !max do
+    let n = Array.get hist i in
+    if n>0 then (incr nonzeros; log "%d: %d\n" i n)
+  done;
+  log "nonzeros = %d\n" !nonzeros
 ;;
 
 (****************************************************************************)
