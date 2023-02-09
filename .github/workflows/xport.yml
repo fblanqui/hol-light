@@ -29,11 +29,11 @@ jobs:
         run: |
           eval `opam env`
           make
-          ./hol2dk xhol.ml recursion.dk
-          dk check recursion.dk
+          ./hol2dk xci.ml test.dk 148587
+          dk check test.dk
       - name: Generate and check lp output
         run: |
           eval `opam env`
           make
-          ./hol2lp xhol.ml recursion.lp
-          lambdapi check --map-dir=hol-light:. recursion.lp
+          ./hol2lp xci.ml test.lp 50000
+          lambdapi check --map-dir=hol-light:. test.lp

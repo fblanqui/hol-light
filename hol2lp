@@ -1,7 +1,12 @@
 #!/bin/sh
 
-if test $# -ne 2; then echo "usage: $0 file.ml file.dk"; exit 1; fi
+if test $# -lt 2 -o $# -gt 3; then echo "usage: $0 file.ml file.dk [proof_number]"; exit 1; fi
 
+case "$3" in
+"") range=All;;
+*) range=Upto $3;;
+esac
+           
 cat << EOF | ocaml
 print_endline "------------------------------------------------------------";;
 print_endline "#use \"topfind\";;";;
@@ -30,6 +35,6 @@ print_endline "#use \"xlp.ml\";;";;
 #use "xlp.ml";;
 print_time();;
 print_endline "------------------------------------------------------------";;
-print_endline "export_to_lp_file \"$2\" (Upto 50000);;";;
+print_endline "export_to_lp_file \"$2\" $range;;";;
 export_to_lp_file "$2" (Upto 50000);;
 EOF
