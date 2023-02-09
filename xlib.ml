@@ -159,22 +159,22 @@ let vars_terms =
   List.sort_uniq compare
     (List.fold_left (fun vs t -> vs @ vars_term t) [] ts);;
 
-(* [variant rmap v] returns a variable with the same type as the one
+(* [rename rmap v] returns a variable with the same type as the one
    of [v] but with a name not occuring in the codomain of [rmap]. *)
-let variant rmap =
-  let rec variant v =
+let rename rmap =
+  let rec rename v =
     match v with
     | Var(n,b) ->
-       if List.exists (fun (_,s) -> s = n) rmap then variant (mk_var(n^"'",b))
+       if List.exists (fun (_,s) -> s = n) rmap then rename (mk_var(n^"'",b))
        else v
     | _ -> assert false
-  in variant
+  in rename
 ;;
 
 (* [add_var rmap v] returns a map extending [rmap] with a mapping from
    [v] to a name not occurring in the codomain of [rmap]. *)
 let add_var rmap v =
-  match variant rmap v with
+  match rename rmap v with
   | Var(n,_) -> (v,n)::rmap
   | _ -> assert false
 ;;
@@ -297,7 +297,9 @@ let print_proof_stats() =
   let total = float_of_int (nb_proofs()) in
   let part n = float_of_int (100 * n) /. total in
   let f i n = log "%10s %9d %2.f%%\n" (name i) n (part n) in
-  Array.iteri f rule_uses
+  Array.iteri f rule_uses;
+  log "number of proofs: %d\nnumber of unused: %d (%2.f%%)\n"
+    (nb_proofs()) hist.(0) (part hist.(0))
 ;;
 
 (****************************************************************************)

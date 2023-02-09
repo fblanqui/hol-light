@@ -150,17 +150,17 @@ module Hol : Hol_kernel = struct
   let dummy_term = Var("",Tyvar"")
   let dummy_proof = Proof(Sequent([],dummy_term,-1),Prefl dummy_term)
 
-  let the_proofs_max = 1000000
+  let the_proofs_max = 100000000 (* 10^8 *)
   let the_proofs = Array.make the_proofs_max dummy_proof
 
   let the_proofs_idx = ref (-1)
 
   let nb_proofs() = !the_proofs_idx
-  
+
   let next_proof_idx() =
     let idx = !the_proofs_idx + 1 in
-    (if idx >= the_proofs_max then failwith "proof array size too small";
-    the_proofs_idx := idx; idx)
+    assert (idx < the_proofs_max);
+    the_proofs_idx := idx; idx;;
 
   let new_proof idx thm content =
     (Array.set the_proofs idx (Proof(thm,content)); thm)
