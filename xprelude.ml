@@ -33,6 +33,8 @@ module OrdStr = struct type t = string let compare = compare end;;
 module MapStr = Map.Make(OrdStr);;
 module SetStr = Set.Make(OrdStr);;
 
+let map_thm_name_id = ref MapStr.empty;;
+
 let map_const_type_vars_pos = ref MapStr.empty;;
 
 let map_file_thms = ref MapStr.empty;;

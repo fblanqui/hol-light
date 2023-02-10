@@ -124,12 +124,21 @@ opam switch link 4.14.1
 eval `opam env`
 ```
 
-To check the generated dk file, write in Xterm2:
+To check the generated dk file with [dkcheck](https://github.com/Deducteam/Dedukti/), write in Xterm2:
 ```
 dk check myfile.dk
 ```
 
-To check the generated lp file, write in Xterm2:
+To check the generated dk file with the current version of
+[kocheck](https://github.com/01mf02/kontroli-rs), we first need to
+slightly change the generated file:
+
+```
+sed -e 's/^injective /def /g' myfile.dk > myfile2.dk
+kocheck -j 7 myfile2.dk
+```
+
+To check the generated lp file with [lambdapi](https://github.com/Deducteam/lambdapi), write in Xterm2:
 ```
 lambdapi check --map-dir hol-light:. myfile.lp
 ```
@@ -149,6 +158,15 @@ lambdapi check myfile.lp
 Experiments:
 ------------
 
+Impact of proof recording on hol-light:
+
+checking hol.ml
+- without proof recording: 1m18s
+-    with proof recording: 1m32s (+18%)
+
+It slightly improves on the performances of ProofTrace which takes
+1m54s (+46%).
+
 On `hol.ml` until `arith.ml` (by commenting from `loads "wf.ml"` to the end):
 - ocaml proof checking: 12.5s
 - ocaml proof checking and recording: 13.2s
@@ -157,13 +175,6 @@ On `hol.ml` until `arith.ml` (by commenting from `loads "wf.ml"` to the end):
 - checking time with kocheck -j 7: 50s
 - lp file generation: 59s, 217 Mo
 - checking time with lambdapi: 5m46s
-
-Remark: for the current version of kocheck to work, you need to
-slightly modify the dk output as follows:
-
-```
-sed -i 's/^injective /def /g' myfile.dk
-```
 
 Implementation
 --------------

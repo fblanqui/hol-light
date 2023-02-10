@@ -88,7 +88,10 @@ let theorems_of_file f =
   let s = load_file f in search_1 s @ search_2 s @ search_3 s
 ;;
 
-let source_files() =
+let files =
+  let cwd = Sys.getcwd() in
+  let n = String.length cwd in
+  log "compute list of files from %s ...\n%!" cwd;
   let rec walk acc = function
   | [] -> acc
   | dir::tail ->
@@ -97,13 +100,15 @@ let source_files() =
        List.fold_left
          (fun (dirs,files) f ->
            try
+             if f <> "" && f.[0] = "." then (dirs, files) else
              if Filename.check_suffix f ".ml"
                 || Filename.check_suffix f ".hl" then
-               let f = Filename.concat dir f in (dirs, f::files)
+               let f = if dir = "." then f else Filename.concat dir f in
+               (dirs, f::files)
              else
                (*FIXME:temporary hack to avoid following links*)
                if f = "_opam" then (dirs, files) else
-               let f = Filename.concat dir f in
+               let f = if dir = "." then f else Filename.concat dir f in
                (*Unix.(match (stat f).st_kind with
                | S_DIR -> (f::dirs, files)
                | _ -> (dirs, files))*)
@@ -113,10 +118,8 @@ let source_files() =
          ([],[]) contents
      in
      walk (files @ acc) (dirs @ tail)
-  in walk [] [Sys.getcwd()]
+  in walk [] ["."]
 ;;
-
-let files = log "compute list of files ...\n%!"; source_files();;
 
 unset_jrh_lexer;;
 
@@ -127,6 +130,8 @@ let update_map_file_thms() =
       (fun map f -> MapStr.add f (theorems_of_file f) map)
       MapStr.empty files
 ;;
+
+let thms_in fn = MapStr.find fn !map_file_thms;;
 
 (****************************************************************************)
 (* Compute the map thm_id -> name, following ProofTrace/proof.ml. *)
@@ -142,7 +147,7 @@ let idx = ref (-1);;
 let cmd_set_idx name = Printf.sprintf "idx := index_of %s;;" name;;
 
 let update_map_thm_id_name() =
-  log "compute map id -> theorem ...\n%!";
+  log "compute map theorem number -> theorem name ...\n%!";
   map_thm_id_name :=
     MapStr.fold
       (fun filename thm_names map ->
@@ -160,5 +165,34 @@ let update_map_thm_id_name() =
 
 let print_map_thm_id_name() =
   MapInt.iter (fun k name -> log "%d %s\n" k name) !map_thm_id_name;;
+
+let update_map_thm_name_id() =
+  log "compute map theorem name -> theorem number ...\n%!";
+  map_thm_name_id :=
+    MapStr.fold
+      (fun filename thm_names map ->
+        List.fold_left
+          (fun map name ->
+            if name = "_" then map else
+            let name = if name = "_FALSITY_" then name ^ "DEF" else name in
+              (* to give a name to the theorem "_FALSITY_" different
+                 from the constant "_FALSITY_". *)
+            try
+              eval (cmd_set_idx name);
+              let n = (*filename ^ "." ^*) name in
+              let f = function
+                | None -> Some !idx
+                | Some _ -> assert false
+              in
+              MapStr.update n f map
+            with _ -> map)
+          map thm_names)
+      !map_file_thms MapStr.empty
+;;
+
+let print_map_thm_name_id() =
+  MapStr.iter (fun name k -> log "%s %d\n" name k) !map_thm_name_id;;
+
+let thm_id name = MapStr.find name !map_thm_name_id;;
 
 set_jrh_lexer;;
