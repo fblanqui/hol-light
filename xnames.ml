@@ -2,58 +2,52 @@
 (* Compute the theorems of each file, following ProofTrace/proofs.ml. *)
 (****************************************************************************)
 
-let PROVE_1_RE = Str.regexp (String.concat "" (
-  "\\(let\\|and\\)[ \n\t]*"::
-  "\\([a-zA-Z0-9_-]+\\)[ \n\t]*"::
-  "=[ \n\t]*"::
-  "\\(prove\\|"::
-  "prove_by_refinement\\|"::
-  "new_definition\\|"::
-  "new_basic_definition\\|"::
-  "new_axiom\\|"::
-  "new_infix_definition\\|"::
-  "INT_OF_REAL_THM\\|"::
-  "define_finite_type\\|"::
-  "TAUT\\|"::
-  "INT_ARITH\\|"::
-  "new_recursive_definition\\)"::
-  []
-))
+unset_jrh_lexer;;
 
-let PROVE_2_RE = Str.regexp (String.concat "" (
-  "\\(let\\|and\\)[ \n\t]*"::
-  "\\([a-zA-Z0-9_-]+\\)[ \n\t]*,[ \n\t]*"::
-  "\\([a-zA-Z0-9_-]+\\)[ \n\t]*"::
-  "=[ \n\t]*"::
-  "\\(define_type\\|"::
-  "(CONJ_PAIR o prove)\\)"::
-  []
-))
-
-let PROVE_3_RE = Str.regexp (String.concat "" (
-  "\\(let\\|and\\)[ \n\t]*"::
-  "\\([a-zA-Z0-9_-]+\\)[ \n\t]*,[ \n\t]*"::
-  "\\([a-zA-Z0-9_-]+\\)[ \n\t]*,[ \n\t]*"::
-  "\\([a-zA-Z0-9_-]+\\)[ \n\t]*"::
-  "=[ \n\t]*"::
-  "\\(new_inductive_definition\\)"::
-  []
-))
-
-let search_1 content =
+let search_1 =
+  let re =
+    Str.regexp
+      (String.concat ""
+         ("\\(let\\|and\\)[ \n\t]*"
+          ::"\\([a-zA-Z0-9_-]+\\)[ \n\t]*"
+          ::"=[ \n\t]*"
+          ::"\\(prove\\|"
+          ::"prove_by_refinement\\|"
+          ::"new_definition\\|"
+          ::"new_basic_definition\\|"
+          ::"new_axiom\\|"
+          ::"new_infix_definition\\|"
+          ::"INT_OF_REAL_THM\\|"
+          ::"define_finite_type\\|"
+          ::"TAUT\\|"
+          ::"INT_ARITH\\|"
+          ::"new_recursive_definition\\)"
+          ::[]))
+  in fun content ->
   let rec search acc start =
     try
-      let _ = Str.search_forward PROVE_1_RE content start in
+      let _ = Str.search_forward re content start in
       let matches = (Str.matched_group 2 content)::[] in
       search (matches @ acc) (Str.match_end())
     with e -> (acc)
   in search [] 0
 ;;
 
-let search_2 content =
+let search_2 =
+  let re =
+    Str.regexp
+      (String.concat ""
+         ("\\(let\\|and\\)[ \n\t]*"
+          ::"\\([a-zA-Z0-9_-]+\\)[ \n\t]*,[ \n\t]*"
+          ::"\\([a-zA-Z0-9_-]+\\)[ \n\t]*"
+          ::"=[ \n\t]*"
+          ::"\\(define_type\\|"
+          ::"(CONJ_PAIR o prove)\\)"
+          ::[]))
+  in fun content ->
   let rec search acc start =
     try
-      let _ = Str.search_forward PROVE_2_RE content start in
+      let _ = Str.search_forward re content start in
       let matches = (Str.matched_group 2 content)::
                     (Str.matched_group 3 content)::
                     [] in
@@ -62,10 +56,21 @@ let search_2 content =
   in search [] 0
 ;;
 
-let search_3 content =
+let search_3 =
+  let re =
+    Str.regexp
+      (String.concat ""
+         ("\\(let\\|and\\)[ \n\t]*"
+          ::"\\([a-zA-Z0-9_-]+\\)[ \n\t]*,[ \n\t]*"
+          ::"\\([a-zA-Z0-9_-]+\\)[ \n\t]*,[ \n\t]*"
+          ::"\\([a-zA-Z0-9_-]+\\)[ \n\t]*"
+          ::"=[ \n\t]*"
+          ::"\\(new_inductive_definition\\)"
+          ::[]))
+  in fun content ->
   let rec search acc start =
     try
-      let _ = Str.search_forward PROVE_3_RE content start in
+      let _ = Str.search_forward re content start in
       let matches = (Str.matched_group 2 content)::
                     (Str.matched_group 3 content)::
                     (Str.matched_group 4 content)::
@@ -89,9 +94,7 @@ let theorems_of_file f =
 ;;
 
 let files =
-  let cwd = Sys.getcwd() in
-  let n = String.length cwd in
-  log "compute list of files from %s ...\n%!" cwd;
+  log "compute list of files from %s ...\n%!" (Sys.getcwd());
   let rec walk acc = function
   | [] -> acc
   | dir::tail ->
@@ -100,7 +103,7 @@ let files =
        List.fold_left
          (fun (dirs,files) f ->
            try
-             if f <> "" && f.[0] = "." then (dirs, files) else
+             if f <> "" && f.[0] = '.' then (dirs, files) else
              if Filename.check_suffix f ".ml"
                 || Filename.check_suffix f ".hl" then
                let f = if dir = "." then f else Filename.concat dir f in
@@ -121,8 +124,6 @@ let files =
   in walk [] ["."]
 ;;
 
-unset_jrh_lexer;;
-
 let update_map_file_thms() =
   log "compute theorem names in each file ...\n%!";
   map_file_thms :=
@@ -131,10 +132,10 @@ let update_map_file_thms() =
       MapStr.empty files
 ;;
 
-let thms_in fn = MapStr.find fn !map_file_thms;;
+let theorems_of_file fn = MapStr.find fn !map_file_thms;;
 
 (****************************************************************************)
-(* Compute the map thm_id -> name, following ProofTrace/proof.ml. *)
+(* Compute the maps thm_id <-> name. *)
 (****************************************************************************)
 
 let eval code =
@@ -194,5 +195,65 @@ let print_map_thm_name_id() =
   MapStr.iter (fun name k -> log "%s %d\n" name k) !map_thm_name_id;;
 
 let thm_id name = MapStr.find name !map_thm_name_id;;
+
+(****************************************************************************)
+(* Compute the dependancy graph of HOL-Light files. *)
+(****************************************************************************)
+
+let search =
+  let re =
+    Str.regexp "^\\(load[st]\\|needs\\|#use\\)[ \t]+\"\\([^\.]+\.[mh]l\\)\"" in
+  fun content ->
+  let rec search acc start =
+    try
+      let _ = Str.search_forward re content start in
+      search (Str.matched_group 2 content :: acc) (Str.match_end())
+    with _ -> acc
+  in search [] 0
+;;
+
+(* [update_map_file_deps()] computes the dependency graph of HOL-Light
+   [files]. *)
+let update_map_file_deps() =
+  map_file_deps :=
+    List.fold_left
+      (fun map filename ->
+        MapStr.add filename (search (load_file filename)) map)
+      MapStr.empty files
+;;
+
+(* [out_map_file_deps oc] prints on [oc] the dependency graph in
+   [map_file_deps] in a Makefile format. *)
+let out_map_file_deps oc =
+  MapStr.iter
+    (fun name deps ->
+      if deps <> [] then out oc "%s:%a\n" name (list_prefix " " string) deps)
+    !map_file_deps;
+;;
+
+let print_map_file_deps() = out_map_file_deps stdout;;
+
+let print_map_file_deps_to filename =
+  let oc = open_out filename in
+  out_map_file_deps oc;
+  close_out oc
+;;
+
+(* [deps f] returns the list of filenames on while file [f] depends. *)
+let deps filename =
+  try MapStr.find filename !map_file_deps with Not_found -> []
+;;
+
+(* [trans_deps f] returns the list of filenames on while file [f]
+   depends, and their dependencies recursively. *)
+let trans_deps filename =
+  let rec trans visited to_visit =
+    match to_visit with
+    | [] -> visited
+    | f::to_visit ->
+       if List.mem f visited then trans visited to_visit
+       else trans (f::visited) (deps f @ to_visit)
+  in trans [] [filename]
+;;
 
 set_jrh_lexer;;

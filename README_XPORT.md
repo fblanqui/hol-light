@@ -16,11 +16,12 @@ rewriting that can read and generate Dedukti proofs.
 Requirements
 ------------
 
-- ocaml 4.02.3 and camlp5 6.17
-or ocaml 4.14.1 and camlp5.8.00.03
+- tested with ocaml 4.02.3 and camlp5 6.17, and ocaml 4.14.1 and camlp5.8.00.03
 - dedukti 2.7
 - lambdapi 2.3
 - ledit (optional, to ease the use of ocaml toplevel)
+
+To see other potential working ocaml-camlp5 pairs, see https://github.com/jrh13/hol-light/pull/71 .
 
 Installation
 ------------
