@@ -81,7 +81,7 @@ To export to Dedukti, write then:
 export_to_dk_file "myfile.dk" All;;
 ```
 
-To export to Lambdapi, write thn:
+To export to Lambdapi, write then:
 ```
 #use "xlp.ml";;
 export_to_lp_file "myfile.lp" All;;
@@ -92,18 +92,38 @@ To get some statistics on proofs:
 print_proof_stats();;
 ```
 
-To get the list of HOL-Light files and named theorems:
+Getting some information on HOL-Light files and theorems
+--------------------------------------------------------
+
+The file `xnames.ml` provides also various functions to get information on HOL-Light files and theorems:
 ```
 #use "xnames.ml";;
+(* list of HOL-Light files *)
 files;;
+(* map giving the theorems proved in each file *)
 update_map_file_thms();;
 !map_file_thms;;
+(* map giving the name of each named theorem number *)
 update_map_thm_id_name();;
 !map_thm_id_name;;
+(* map giving the number of every named theorem *)
+update_map_name_thm_id();;
+!map_name_thm_id;;
+(* function returning the number of a theorem name *)
+thm_id;;
+(* dependency graph of HOL-Light files *)
+update_map_file_deps();;
+!map_file_deps;;
+(* function outputing the dependency graph in Makefile syntax *)
+print_map_file_deps_to;;
+(* function giving the declared dependencies of a file *)
+deps;;
+(* function giving the list of all files a file depends on*)
+trans_deps;;
 ```
 
-Checking the generated dk/lp files:
------------------------------------
+Checking the generated dk/lp files
+----------------------------------
 
 In case hol-light and dkcheck/lambdapi do not use the same ocaml
 versions, it is convenient to put generated files in a subdirectory
@@ -156,8 +176,8 @@ and simply write in a shell:
 lambdapi check myfile.lp
 ```
 
-Experiments:
-------------
+Results
+-------
 
 Impact of proof recording on hol-light:
 
