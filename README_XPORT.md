@@ -125,7 +125,38 @@ trans_deps;;
 Checking the generated dk/lp files
 ----------------------------------
 
-In case hol-light and dkcheck/lambdapi do not use the same ocaml
+To check the generated dk file with [dkcheck](https://github.com/Deducteam/Dedukti/), write:
+```
+dk check myfile.dk
+```
+
+To check the generated dk file with the current version of
+[kocheck](https://github.com/01mf02/kontroli-rs), we first need to
+slightly change the generated file:
+
+```
+sed -e 's/^injective /def /g' myfile.dk > myfile2.dk
+kocheck -j 7 myfile2.dk
+```
+
+To check the generated lp file with [lambdapi](https://github.com/Deducteam/lambdapi), write:
+```
+lambdapi check --map-dir hol-light:. myfile.lp
+```
+
+or create a file `lambdapi.pkg`:
+```
+package_name = hol-light
+root_path = hol-light
+```
+
+and simply write:
+
+```
+lambdapi check myfile.lp
+```
+
+Remark: In case hol-light and dkcheck/lambdapi do not use the same ocaml
 versions, it is convenient to put generated files in a subdirectory
 and tell opam to use different switches in each directory:
 
@@ -145,36 +176,7 @@ opam switch link 4.14.1
 eval `opam env`
 ```
 
-To check the generated dk file with [dkcheck](https://github.com/Deducteam/Dedukti/), write in Xterm2:
-```
-dk check myfile.dk
-```
-
-To check the generated dk file with the current version of
-[kocheck](https://github.com/01mf02/kontroli-rs), we first need to
-slightly change the generated file:
-
-```
-sed -e 's/^injective /def /g' myfile.dk > myfile2.dk
-kocheck -j 7 myfile2.dk
-```
-
-To check the generated lp file with [lambdapi](https://github.com/Deducteam/lambdapi), write in Xterm2:
-```
-lambdapi check --map-dir hol-light:. myfile.lp
-```
-
-or create a file `lambdapi.pkg`:
-```
-package_name = hol-light
-root_path = hol-light
-```
-
-and simply write in a shell:
-
-```
-lambdapi check myfile.lp
-```
+Then, you simply need to generate dk and lp files in the `xport/` directory.
 
 Results
 -------
