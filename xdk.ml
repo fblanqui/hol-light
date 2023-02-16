@@ -394,6 +394,7 @@ let proofs_in_range oc = function
      theorem oc x p
   | Upto y -> for k = 0 to y do theorem oc k (proof_at k) done
   | All -> iter_proofs (theorem oc)
+  | Inter(x,y) -> for k = x to y do theorem oc k (proof_at k) done
 ;;
 
 (* [export_to_dk_file f r] creates a file of name [f] and outputs to this

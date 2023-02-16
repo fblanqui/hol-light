@@ -4,12 +4,13 @@ unset_jrh_lexer;;
 (* Ranges of proof indexes. *)
 (****************************************************************************)
 
-type range = Only of int | Upto of int | All;;
+type range = Only of int | Upto of int | All | Inter of int * int;;
 
 let in_range = function
   | Only x -> fun k -> k = x
   | Upto x -> fun k -> k <= x
   | All -> fun _ -> true
+  | Inter(x,y) -> fun k -> x <= k && k <= y
 ;;
 
 (****************************************************************************)

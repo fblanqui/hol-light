@@ -63,8 +63,7 @@ let rec term rmap oc t =
        with Not_found -> out oc "/*%a*/(el %a)" name n typ b
      end
   | Const(c,b) ->
-     let ps = MapStr.find c !map_const_type_vars_pos in
-     begin match List.map (subtype b) ps with
+     begin match List.map (subtype b) (const_type_vars_pos c) with
      | [] -> out oc "%a" name c
      | bs -> out oc "(@%a%a)" name c (list_prefix " " typ) bs
      end
@@ -337,6 +336,7 @@ flag \"print_domains\" on;
 print thm_%d;\n" x*)
   | Upto y -> for k = 0 to y do theorem oc k (proof_at k) done
   | All -> iter_proofs (theorem oc)
+  | Inter(x,y) -> for k = x to y do theorem oc k (proof_at k) done
 ;;
 
 (* [export_to_lp_file f r] creates a file of name [f] and outputs to this
