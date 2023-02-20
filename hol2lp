@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if test $# -lt 2 -o $# -gt 3; then echo "usage: $0 file.ml file.dk [proof_number]"; exit 1; fi
+if test $# -lt 2 -o $# -gt 3; then echo "usage: $0 file.ml file [proof_number]"; exit 1; fi
 
 case "$3" in
 "") range='All';;
@@ -27,9 +27,6 @@ print_endline "#use \"$1\";;";;
 print_endline "------------------------------------------------------------";;
 print_endline "#use \"xlib.ml\";;";;
 #use "xlib.ml";;
-print_endline "------------------------------------------------------------";;
-print_endline "update_map_const_type_vars_pos();;";;
-update_map_const_type_vars_pos();;
 print_endline "------------------------------------------------------------";;
 print_endline "#use \"xlp.ml\";;";;
 #use "xlp.ml";;
