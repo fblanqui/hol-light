@@ -5,7 +5,7 @@
 unset_jrh_lexer;;
 
 (****************************************************************************)
-(* Translation of types and terms. *)
+(* Translation of names. *)
 (****************************************************************************)
 
 let name oc n =
@@ -22,6 +22,10 @@ let name oc n =
      | "?!" -> "∃!"
      | "~" -> "¬"
      | _ -> n);;
+
+(****************************************************************************)
+(* Translation of types. *)
+(****************************************************************************)
 
 let rec raw_typ oc b =
   match b with
@@ -67,6 +71,7 @@ let abbrev_typ =
      | _ -> out oc "(type%d%a)" k (list_prefix " " raw_typ) tvs
 ;;*)
 
+(* [decl_map_typ oc m] outputs on [oc] the type abbraviations of [m]. *)
 let decl_map_typ oc m =
   let abbrev (b,(k,n)) =
     out oc "symbol type%d" k;
@@ -78,7 +83,11 @@ let decl_map_typ oc m =
        (MapTyp.fold (fun b x l -> (b,x)::l) m []))
 ;;
 
-(* [canonical_typ b] returns the type variables of [b] togather with a
+(****************************************************************************)
+(* Translation of types. *)
+(****************************************************************************)
+
+(* [canonical_typ b] returns the type variables of [b] together with a
    type alpha-equivalent to any type alpha-equivalent to [b]. *)
 let canonical_typ =
   let type_var i tv = mk_vartype ("a" ^ string_of_int i), tv in
@@ -115,6 +124,10 @@ let abbrev_typ =
 let use_abbrev = ref true;;
 
 let typ oc t = if !use_abbrev then abbrev_typ oc t else raw_typ oc t;;
+
+(****************************************************************************)
+(* Translation of terms. *)
+(****************************************************************************)
 
 let raw_var oc t =
   match t with
@@ -299,7 +312,7 @@ let term rmap oc t =
 ;;
 
 (****************************************************************************)
-(* Proof translation. *)
+(* Translation of proofs. *)
 (****************************************************************************)
 
 (* In a theorem, the hypotheses [t1;..;tn] are given the names

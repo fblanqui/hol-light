@@ -5,7 +5,7 @@
 unset_jrh_lexer;;
 
 (****************************************************************************)
-(* Translation of types and terms. *)
+(* Translation of names. *)
 (****************************************************************************)
 
 let is_valid_id =
@@ -35,11 +35,30 @@ let name oc n = string oc (valid_name n);;
 
 let suffix s oc n = name oc (n ^ s);;
 
+(****************************************************************************)
+(* Translation of types. *)
+(****************************************************************************)
+
 let rec raw_typ oc b =
   match b with
   | Tyvar n -> out oc "%a" name n
   | Tyapp(c,[]) -> out oc "%a" name c
   | Tyapp(c,bs) -> out oc "(%a%a)" name c (list_prefix " " raw_typ) bs
+;;
+
+let subst_typ =
+  olist (fun oc (b,v) -> out oc "%a -> %a" raw_typ v raw_typ b);;
+
+(* [decl_map_typ oc m] outputs on [oc] the type abbraviations of [m]. *)
+let decl_map_typ oc m =
+  let abbrev (b,(k,n)) =
+    out oc "def type%d" k;
+    for i=0 to n-1 do out oc " a%d" i done;
+    out oc " := %a.\n" raw_typ b
+  in
+  List.iter abbrev
+    (List.sort (fun (_,(k1,_)) (_,(k2,_)) -> k1 - k2)
+       (MapTyp.fold (fun b x l -> (b,x)::l) m []))
 ;;
 
 (* [typ tvs oc b] prints on [oc] the type [b]. Type variables not in
@@ -54,6 +73,10 @@ let typ tvs =
     | Tyapp(c,bs) -> out oc "(%a%a)" name c (list_prefix " " typ) bs
   in typ
 ;;
+
+(****************************************************************************)
+(* Translation of terms. *)
+(****************************************************************************)
 
 let raw_var oc t =
   match t with
@@ -108,16 +131,13 @@ let term tvs =
 ;;
 
 (* for debug *)
-let subst_typ tvs =
-  let typ = typ tvs in
-  list_sep "; " (fun oc (b,v) -> out oc "%a -> %a" typ v typ b);;
 
 let subst_term tvs rmap =
   list_sep "; "
     (fun oc (t,v) -> out oc "%a -> %a" raw_var v (term tvs rmap) t);;
 
 (****************************************************************************)
-(* Proof translation. *)
+(* Translation of proofs. *)
 (****************************************************************************)
 
 (* In a theorem, the hypotheses [t1;..;tn] are given the names
@@ -330,10 +350,10 @@ thm TRANS : a : Set -> x : El a -> y : El a -> z : El a ->
 ";;
 
 let theory oc =
-  let no_bool_fun (n,_) = match n with "bool" | "fun" -> false | _ -> true in
-  let types = List.filter no_bool_fun (types()) in
-  let no_eq (n,_) = match n with "=" -> false | _ -> true in
-  let constants = List.filter no_eq (constants()) in
+  let f (n,_) = match n with "bool" | "fun" -> false | _ -> true in
+  let types = List.filter f (types()) in
+  let f (n,_) = match n with "=" | "el" -> false | _ -> true in
+  let constants = List.filter f (constants()) in
   out oc
 "%s
 (; types ;)
