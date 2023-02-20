@@ -48,7 +48,8 @@ let typ tvs =
   let rec typ oc b =
     match b with
     | Tyvar n ->
-       if List.mem b tvs then out oc "%a" name n else string oc "bool"
+       if List.mem b tvs then out oc "%a" name n
+       else out oc "(;%a;)bool" name n
     | Tyapp(c,[]) -> out oc "%a" name c
     | Tyapp(c,bs) -> out oc "(%a%a)" name c (list_prefix " " typ) bs
   in typ
@@ -93,7 +94,7 @@ let term tvs =
          with Not_found -> out oc "(;%a;)(el %a)" name n typ b
        end
     | Const(n,b) ->
-       begin match List.map (subtype b) (const_type_vars_pos n) with
+       begin match List.map (subtyp b) (const_typ_vars_pos n) with
        | [] -> out oc "%a" name n
        | bs -> out oc "(%a%a)" name n (list_prefix " " typ) bs
        end
@@ -107,7 +108,7 @@ let term tvs =
 ;;
 
 (* for debug *)
-let subst_type tvs =
+let subst_typ tvs =
   let typ = typ tvs in
   list_sep "; " (fun oc (b,v) -> out oc "%a -> %a" typ v typ b);;
 
@@ -145,7 +146,7 @@ let subproof tvs rmap ty_su tm_su ts1 i2 oc p2 =
   (* bs2 is the application of ty_su on tvs2 *)
   let bs2 = List.map (type_subst ty_su) tvs2 in
   (* tvbs2 is the type variables of bs2 *)
-  let tvbs2 = type_vars bs2 in
+  let tvbs2 = tyvarsl bs2 in
   (* we remove from tvbs2 the variables of tvs *)
   let tvbs2 =
     List.fold_left
@@ -180,22 +181,22 @@ let proof tvs rmap =
     let sub = subproof tvs rmap [] [] ts in
     match content with
     | Prefl(t) ->
-       out oc "REFL %a %a" typ (get_eq_type p) term t
+       out oc "REFL %a %a" typ (get_eq_typ p) term t
     | Ptrans(k1,k2) ->
        let p1 = proof_at k1 and p2 = proof_at k2 in
-       let a,x,y = get_eq_type_args p1 in
+       let a,x,y = get_eq_typ_args p1 in
        let _,z = get_eq_args p2 in
        out oc "TRANS %a %a %a %a %a %a"
-         typ (get_eq_type p1) term x term y term z (sub k1) p1 (sub k2) p2
+         typ (get_eq_typ p1) term x term y term z (sub k1) p1 (sub k2) p2
     | Pmkcomb(k1,k2) ->
        let p1 = proof_at k1 and p2 = proof_at k2 in
-       let ab,s,t = get_eq_type_args p1 in
+       let ab,s,t = get_eq_typ_args p1 in
        let a,b = match ab with Tyapp("fun",[a;b]) -> a,b | _ -> assert false in
        let u,v = get_eq_args p2 in
        out oc "MK_COMB %a %a %a %a %a %a %a %a"
          typ a typ b term s term t term u term v (sub k1) p1 (sub k2) p2
     | Pabs(k,t) ->
-       let ab,f,g = get_eq_type_args p in
+       let ab,f,g = get_eq_typ_args p in
        let a,b = match ab with Tyapp("fun",[a;b]) -> a,b | _ -> assert false in
        let rmap' = add_var rmap t in
        out oc "fun_ext %a %a %a %a (%a => %a)"
@@ -227,9 +228,9 @@ let proof tvs rmap =
     | Pinstt(k,s) ->
        out oc "%a" (subproof tvs rmap s [] ts k) (proof_at k)
     | Pdef(_,n,b) ->
-       let ps = const_type_vars_pos n in
+       let ps = const_typ_vars_pos n in
        (*out oc "(;t=%a; b=%a; ps=%a;)" term t typ b type_var_pos_list ps;*)
-       begin match List.map (subtype b) ps with
+       begin match List.map (subtyp b) ps with
        | [] -> out oc "%a" (suffix "_def") n
        | bs -> out oc "(%a%a)" (suffix "_def") n (list_prefix " " typ) bs
        end
@@ -401,6 +402,7 @@ let proofs_in_range oc = function
    file the proofs in range [r]. *)
 let export_to_dk_file filename r =
   print_time();
+  update_map_const_typ_vars_pos();
   log "generate %s ...\n%!" filename;
   let oc = open_out filename in
   theory oc;

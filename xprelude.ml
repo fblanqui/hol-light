@@ -50,9 +50,9 @@ module SetStr = Set.Make(OrdStr);;
    theorem numbers. *)
 let map_thm_name_id = ref MapStr.empty;;
 
-(* [map_const_type_vars_pos] is used to hold a map from constant names
+(* [map_const_typ_vars_pos] is used to hold a map from constant names
    to the positions of type variables in the types of the constants. *)
-let map_const_type_vars_pos = ref MapStr.empty;;
+let map_const_typ_vars_pos = ref MapStr.empty;;
 
 (* [map_file_thms] is used to hold the map from file names to theorem
    names. *)
@@ -61,3 +61,6 @@ let map_file_thms = ref MapStr.empty;;
 (* [map_file_deps] is used to hold the dependency graph of HOL-Light
    files, that is, the map from file names to their dependencies. *)
 let map_file_deps = ref MapStr.empty;;
+
+(* [el_added] indicates whether the constant "el" has been added. *)
+let el_added = ref false;

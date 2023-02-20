@@ -66,28 +66,32 @@ ledit -x -h ~/.ocaml_history ocaml
 
 You can add an alias in your `~/.bashrc` to save time.
 
-In the OCaml toplevel, write:
+In the OCaml toplevel, first write:
 ```
 #use "xprelude.ml";;
 #use "hol.ml";;
 (* load any other HOL-Light file here *)
 #use "xlib.ml";;
-update_map_const_type_vars_pos();;
 ```
 
-To export to Dedukti, write then:
+Then, to export to Dedukti, write:
 ```
 #use "xdk.ml";;
 export_to_dk_file "myfile.dk" All;;
 ```
 
-To export to Lambdapi, write then:
+And, to export to Lambdapi, write:
 ```
 #use "xlp.ml";;
-export_to_lp_file "myfile.lp" All;;
+export_to_lp_file "myfile" All;;
 ```
 
-To get some statistics on proofs:
+This will be generate 3 lp files:
+- `myfile_types.lp` containing HOL-Light types
+- `myfile_terms.lp` containing HOL-Light terms
+- `myfile_proofs.lp` containing HOL-Light proofs
+
+By the way, to get some statistics on proofs, simply do:
 ```
 print_proof_stats();;
 ```

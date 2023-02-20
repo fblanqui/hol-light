@@ -38,6 +38,8 @@ let string oc s = out oc "%s" s;;
 
 let pair f g oc (x, y) = out oc "%a, %a" f x g y;;
 
+let opair f g oc (x, y) = out oc "(%a, %a)" f x g y;;
+
 let prefix p elt oc x = out oc "%s%a" p elt x;;
 
 let list_sep sep elt oc xs =
@@ -48,9 +50,9 @@ let list_sep sep elt oc xs =
 
 let list elt oc xs = list_sep "" elt oc xs;;
 
-let list_prefix p elt oc xs = list (prefix p elt) oc xs;;
-
 let olist elt oc xs = out oc "[%a]" (list_sep "; " elt) xs;;
+
+let list_prefix p elt oc xs = list (prefix p elt) oc xs;;
 
 let hstats oc ht =
   let open Hashtbl in let s = stats ht in
@@ -62,10 +64,30 @@ let hstats oc ht =
 (* Functions on types and terms. *)
 (****************************************************************************)
 
+(* Sets and maps on types. *)
+module OrdTyp = struct type t = hol_type let compare = compare end;;
+module SetTyp = Set.Make(OrdTyp);;
+module MapTyp = Map.Make(OrdTyp);;
+
 (* Sets and maps on terms. *)
-module OrdTrm = struct type t = string let compare = compare end;;
+module OrdTrm = struct type t = term let compare = compare end;;
 module MapTrm = Map.Make(OrdTrm);;
 module SetTrm = Set.Make(OrdTrm);;
+
+(* Printing functions for debug. *)
+let rec otyp oc b =
+  match b with
+  | Tyvar n -> out oc "(Tyvar %s)" n
+  | Tyapp(n,bs) -> out oc "Tyapp(%s,%a)" n (olist otyp) bs
+;;
+
+let rec oterm oc t =
+  match t with
+  | Var(n,b) -> out oc "Var(%s,%a)" n otyp b
+  | Const(n,b) -> out oc "Const(%s,%a)" n otyp b
+  | Comb(u,v) -> out oc "Comb(%a,%a)" oterm u oterm v
+  | Abs(u,v) -> out oc "Abs(%a,%a)" oterm u oterm v
+;;
 
 (* [head_args t] returns the pair [h,ts] such that [t] is of the t is
    the Comb application of [h] to [ts]. *)
@@ -77,9 +99,9 @@ let head_args =
   in aux []
 ;;
 
-(* [get_eq_type p] returns the type [b] of the terms t and u of the
+(* [get_eq_typ p] returns the type [b] of the terms t and u of the
    conclusion of the proof [p] assumed of the form [= t u]. *)
-let get_eq_type p =
+let get_eq_typ p =
   let Proof(th,_) = p in
   match concl th with
   | Comb(Comb(Const("=",Tyapp("fun",[b;_])),_),_) -> b
@@ -95,10 +117,10 @@ let get_eq_args p =
   | _ -> let t = mk_var("error",bool_ty) in t,t (*assert false*)
 ;;
 
-(* [get_eq_type_args p] returns the type of the terms t and u, and the
+(* [get_eq_typ_args p] returns the type of the terms t and u, and the
    terms t and u, of the conclusion of the proof [p] assumed of the
    form [= t u]. *)
-let get_eq_type_args p =
+let get_eq_typ_args p =
   let Proof(th,_) = p in
   match concl th with
   | Comb(Comb(Const("=",Tyapp("fun",[b;_])),t),u) -> b,t,u
@@ -118,9 +140,9 @@ let vsubstl s ts = if s = [] then ts else List.map (vsubst s) ts;;
 (* It is important for the export that list of type variables and term
    free variables are always ordered and have no duplicate. *)
 
-(* [type_vars bs] returns the ordered list with no duplicate of type
+(* [tyvarsl bs] returns the ordered list with no duplicate of type
    variables occurring in the list of types [bs]. *)
-let type_vars bs =
+let tyvarsl bs =
   List.sort_uniq compare
     (List.fold_left (fun l b -> tyvars b @ l) [] bs)
 ;;
@@ -160,9 +182,9 @@ let vars_terms =
   List.sort_uniq compare
     (List.fold_left (fun vs t -> vs @ vars_term t) [] ts);;
 
-(* [rename rmap v] returns a variable with the same type as the one
+(* [rename_var rmap v] returns a variable with the same type as the one
    of [v] but with a name not occuring in the codomain of [rmap]. *)
-let rename rmap =
+let rename_var rmap =
   let rec rename v =
     match v with
     | Var(n,b) ->
@@ -175,7 +197,7 @@ let rename rmap =
 (* [add_var rmap v] returns a map extending [rmap] with a mapping from
    [v] to a name not occurring in the codomain of [rmap]. *)
 let add_var rmap v =
-  match rename rmap v with
+  match rename_var rmap v with
   | Var(n,_) -> (v,n)::rmap
   | _ -> assert false
 ;;
@@ -184,19 +206,39 @@ let add_var rmap v =
    to all the variables occurring in the list of variables [vs]. *)
 let renaming_map = List.fold_left add_var [];;
 
-(* Subterm positions in types are represented as list of natural numbers. *)
+(* Add a new HOL-Light constant "el" that could be defined as:
+let el b =
+  mk_comb(mk_const("@",[b,aty]),mk_abs(mk_var("_",b),mk_const("T",[])))
+*)
+if not(!el_added) then (new_constant("el",aty); el_added := true);;
 
-(* [subtype b p] returns the type at position [p] in the type [b]. *)
-let rec subtype b p =
-  match b, p with
-  | _, [] -> b
-  | Tyapp(_, bs), p::ps -> subtype (List.nth bs p) ps
-  | _ -> invalid_arg "subtype"
+let mk_el b = mk_const("el",[b,aty]);;
+
+(* [rename rmap t] returns a new term obtained from [t] by applying
+   [rmap] and by replacing variables not occurring in [rmap] by the
+   constant [el]. *)
+let rec rename rmap t =
+  match t with
+  | Var(n,b) -> (try mk_var(List.assoc t rmap,b) with Not_found -> mk_el b)
+  | Const(_,_) -> t
+  | Comb(u,v) -> mk_comb(rename rmap u, rename rmap v)
+  | Abs(u,v) ->
+     let rmap' = add_var rmap u in mk_abs(rename rmap' u,rename rmap' v)
 ;;
 
-(* [type_vars_pos b] returns an association list mapping every type
+(* Subterm positions in types are represented as list of natural numbers. *)
+
+(* [subtyp b p] returns the type at position [p] in the type [b]. *)
+let rec subtyp b p =
+  match b, p with
+  | _, [] -> b
+  | Tyapp(_, bs), p::ps -> subtyp (List.nth bs p) ps
+  | _ -> invalid_arg "subtyp"
+;;
+
+(* [typ_vars_pos b] returns an association list mapping every type
    variable occurrence to its posiion in [b]. *)
-let type_vars_pos b =
+let typ_vars_pos b =
   let rec aux acc l =
     match l with
     | [] -> acc
@@ -211,7 +253,7 @@ let type_vars_pos b =
 ;;
 
 (* test:
-type_vars_pos
+typ_vars_pos
   (mk_type("fun",[mk_vartype"a"
                  ;mk_type("fun",[mk_vartype"a";mk_vartype"b"])]));;*)
 
@@ -309,11 +351,11 @@ let print_proof_stats() =
    i-th type variable (as given by tyvars). *)
 (****************************************************************************)
 
-let update_map_const_type_vars_pos() =
-  map_const_type_vars_pos :=
+let update_map_const_typ_vars_pos() =
+  map_const_typ_vars_pos :=
     List.fold_left
       (fun map (n,b) ->
-        let l = type_vars_pos b in
+        let l = typ_vars_pos b in
         let ps =
           List.map
             (fun v ->
@@ -330,15 +372,27 @@ let update_map_const_type_vars_pos() =
       MapStr.empty (constants())
 ;;
 
-let type_var_pos_list = list_sep "; " (list_sep "," int);;
+let typ_var_pos_list = list_sep "; " (list_sep "," int);;
 
-let print_map_const_type_vars_pos() =
+let print_map_const_typ_vars_pos() =
   MapStr.iter
     (fun c ps -> log "%s %a\n" c (olist (olist int)) ps)
-    !map_const_type_vars_pos;;
+    !map_const_typ_vars_pos;;
 
-let const_type_vars_pos n =
-  try MapStr.find n !map_const_type_vars_pos
-  with Not_found -> log "no const_type_vars_pos for %s@." n; assert false;;
+let const_typ_vars_pos n =
+  try MapStr.find n !map_const_typ_vars_pos
+  with Not_found -> log "no const_typ_vars_pos for %s\n%!" n; assert false;;
+
+(****************************************************************************)
+(* Type and term abbreviations to reduce size of generated files. *)
+(****************************************************************************)
+
+(* [map_typ] is used to hold a map from types to type abbreviations. *)
+let map_typ = ref MapTyp.empty;;
+let reset_map_typ() = map_typ := MapTyp.empty;;
+
+(* [map_term] is used to hold a map from terms to term abbreviations. *)
+let map_term = ref MapTrm.empty;;
+let reset_map_term() = map_term := MapTrm.empty;;
 
 set_jrh_lexer;;
