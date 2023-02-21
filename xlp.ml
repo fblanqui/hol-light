@@ -29,79 +29,17 @@ let name oc n =
 
 let rec raw_typ oc b =
   match b with
-  | Tyvar n -> out oc "%a" name n
-  | Tyapp(c,[]) -> out oc "%a" name c
+  | Tyvar n
+  | Tyapp(n,[]) -> name oc n
   | Tyapp(c,bs) -> out oc "(%a%a)" name c (list_prefix " " raw_typ) bs
 ;;
 
-let subst_type =
-  olist (fun oc (b,v) -> out oc "%a -> %a" raw_typ v raw_typ b);;
-
-(*let decl_map_typ oc m =
-  let abbrev (b,(k,tvs)) =
-    out oc "symbol type%d%a ≔ %a;\n" k (list_prefix " " raw_typ) tvs raw_typ b
-  in
-  List.iter abbrev
-    (List.sort (fun (_,(k1,_)) (_,(k2,_)) -> k1 - k2)
-       (MapTyp.fold (fun b x l -> (b,x)::l) m []))
-;;
-
 let abbrev_typ =
   let idx = ref (-1) in
   fun oc b ->
   match b with
-  | Tyvar n -> out oc "%a" name n
-  | Tyapp(c,[]) -> out oc "%a" name c
-  | _ ->
-     (* check whether the type is already abbreviated; add a new
-        abbreviation if needed *)
-     let k, tvs =
-       match MapTyp.find_opt b !map_typ with
-       | Some x -> x
-       | None ->
-          let k = !idx + 1 in
-          idx := k;
-          let tvs = tyvars b in
-          let x = (k,tvs) in
-          map_typ := MapTyp.add b x !map_typ;
-          x
-     in
-     match tvs with
-     | [] -> out oc "type%d" k
-     | _ -> out oc "(type%d%a)" k (list_prefix " " raw_typ) tvs
-;;*)
-
-(* [decl_map_typ oc m] outputs on [oc] the type abbraviations of [m]. *)
-let decl_map_typ oc m =
-  let abbrev (b,(k,n)) =
-    out oc "symbol type%d" k;
-    for i=0 to n-1 do out oc " a%d" i done;
-    out oc " ≔ %a;\n" raw_typ b
-  in
-  List.iter abbrev
-    (List.sort (fun (_,(k1,_)) (_,(k2,_)) -> k1 - k2)
-       (MapTyp.fold (fun b x l -> (b,x)::l) m []))
-;;
-
-(****************************************************************************)
-(* Translation of types. *)
-(****************************************************************************)
-
-(* [canonical_typ b] returns the type variables of [b] together with a
-   type alpha-equivalent to any type alpha-equivalent to [b]. *)
-let canonical_typ =
-  let type_var i tv = mk_vartype ("a" ^ string_of_int i), tv in
-  fun b ->
-  let tvs = tyvars b in
-  tvs, type_subst (List.mapi type_var tvs) b
-;;
-
-let abbrev_typ =
-  let idx = ref (-1) in
-  fun oc b ->
-  match b with
-  | Tyvar n -> out oc "%a" name n
-  | Tyapp(c,[]) -> out oc "%a" name c
+  | Tyvar n
+  | Tyapp(n,[]) -> name oc n
   | _ ->
      (* check whether the type is already abbreviated; add a new
         abbreviation if needed *)
@@ -121,12 +59,23 @@ let abbrev_typ =
      | _ -> out oc "(type%d%a)" k (list_prefix " " raw_typ) tvs
 ;;
 
-let use_abbrev = ref true;;
+let typ oc b = if !use_abbrev then abbrev_typ oc b else raw_typ oc b;;
 
-let typ oc t = if !use_abbrev then abbrev_typ oc t else raw_typ oc t;;
+(* [decl_map_typ oc m] outputs on [oc] the type abbreviations of [m]. *)
+let decl_map_typ oc m =
+  let abbrev (b,(k,n)) =
+    out oc "symbol type%d" k;
+    for i=0 to n-1 do out oc " a%d" i done;
+    (* We can use [raw_typ] here since [b] canonical. *)
+    out oc " ≔ %a;\n" raw_typ b
+  in
+  List.iter abbrev
+    (List.sort (fun (_,(k1,_)) (_,(k2,_)) -> k1 - k2)
+       (MapTyp.fold (fun b x l -> (b,x)::l) m []))
+;;
 
 (****************************************************************************)
-(* Translation of terms. *)
+(* Translation of term variables. *)
 (****************************************************************************)
 
 let raw_var oc t =
@@ -137,10 +86,10 @@ let raw_var oc t =
 
 let var rmap oc t =
   try name oc (List.assoc t rmap)
-  with Not_found ->
-    match t with
+  with Not_found -> assert false
+    (*match t with
     | Var(n,_) -> out oc "%a /*not found*/" name n
-    | _ -> assert false
+    | _ -> assert false*)
 ;;
 
 let raw_decl_var oc t =
@@ -155,7 +104,9 @@ let decl_var rmap oc t =
   | _ -> assert false
 ;;
 
-let raw_decl_param oc v = out oc " (%a)" raw_decl_var v;;
+(****************************************************************************)
+(* Translation of terms. *)
+(****************************************************************************)
 
 let decl_param rmap oc v = out oc " (%a)" (decl_var rmap) v;;
 
@@ -174,9 +125,6 @@ let rec raw_term oc t =
      out oc "(λ %a, %a)" raw_decl_var t raw_term u
 ;;
 
-let subst_term =
-  olist (fun oc (t,v) -> out oc "%a -> %a" raw_decl_var v raw_term t);;
-
 (* [unabbrev_term rmap oc t] prints on [oc] the term [t] with term
    variable renaming map [rmap] without using term abbreviations. A
    variable of type b not in [rmap] is replaced by [el b]. *)
@@ -189,97 +137,13 @@ let unabbrev_term =
        with Not_found -> out oc "/*%a*/(el %a)" name n typ b
      end
   | Const _ -> raw_term oc t
-  | Comb(_,_) -> (*out oc "(%a %a)" (term rmap) t1 (term rmap) t2*)
+  | Comb(_,_) ->
      let h, ts = head_args t in
      out oc "(%a%a)" (term rmap) h (list_prefix " " (term rmap)) ts
-  | Abs(t,u) ->
-     let rmap' = add_var rmap t in
-     out oc "(λ %a, %a)" (decl_var rmap') t (term rmap') u
+  | Abs(u,v) ->
+     let rmap' = add_var rmap u in
+     out oc "(λ %a, %a)" (decl_var rmap') u (term rmap') v
   in term
-;;
-
-(*let decl_map_term oc m =
-  let abbrev (t,(k,tvs,vs)) =
-    out oc "symbol term%d%a%a ≔ %a;\n"
-      k (list_prefix " " raw_typ) tvs (list_prefix " " raw_decl_param) vs
-      raw_term t
-  in
-  List.iter abbrev
-    (List.sort (fun (_,(k1,_,_)) (_,(k2,_,_)) -> k1 - k2)
-       (MapTrm.fold (fun b x l -> (b,x)::l) m []))
-;;
-
-let abbrev_term =
-  let idx = ref (-1) in
-  fun oc t ->
-  match t with
-  | Var _
-  | Const _ -> raw_term oc t
-  | _ ->
-     (* check whether the term is already abbreviated; add a new
-        abbreviation if needed *)
-  let k, tvs, vs =
-    match MapTrm.find_opt t !map_term with
-    | Some x -> x
-    | None ->
-     let k = !idx + 1 in
-     idx := k;
-     let tvs = type_vars_in_term t in
-     let vs = frees t in
-     let x = (k,tvs,vs) in
-     map_term := MapTrm.add t x !map_term;
-     x
-  in
-  out oc "(term%d%a%a)"
-    k (list_prefix " " typ) tvs (list_prefix " " raw_term) vs
-;;*)
-
-let decl_map_term oc m =
-  let abbrev (t,(k,n,bs)) =
-    out oc "symbol term%d" k;
-    for i=0 to n-1 do out oc " a%d" i done;
-    List.iteri (fun i b -> out oc " (x%d: El %a)" i typ b) bs;
-    out oc " ≔ %a;\n" raw_term t
-  in
-  List.iter abbrev
-    (List.sort (fun (_,(k1,_,_)) (_,(k2,_,_)) -> k1 - k2)
-       (MapTrm.fold (fun b x l -> (b,x)::l) m []))
-;;
-
-(* [canonical_term t] returns the type variables and term variables of
-   [t] together with a term alpha-equivalent to any term
-   alpha-equivalent to [t]. *)
-let canonical_term =
-  let type_var i tv = mk_vartype ("a" ^ string_of_int i), tv in
-  let term_var i v =
-    match v with
-    | Var(_,b) -> v, mk_var ("x" ^ string_of_int i, b)
-    | _ -> assert false
-  in
-  (* [subst i su t] applies [su] on [t] and rename abstracted
-     variables as well by using [i]. *)
-  let rec subst i su t =
-    (*log "subst %d %a %a\n%!" i (olist (opair oterm oterm)) su oterm t;*)
-    match t with
-    | Var(n,b) -> (try List.assoc t su with Not_found -> assert false)
-    | Const _ -> t
-    | Comb(u,v) -> mk_comb(subst i su u, subst i su v)
-    | Abs(u,v) ->
-       match u with
-       | Var(_,b) ->
-          let u' = mk_var ("y" ^ string_of_int i, b) in
-          mk_abs(u', subst (i+1) ((u,u')::su) v)
-       | _ -> assert false
-  in
-  fun t ->
-  let tvs = type_vars_in_term t and vs = frees t in
-  let su = List.mapi type_var tvs in
-  let t' = inst su t in
-  let vs' = List.map (inst su) vs in
-  let get_type = function Var(_,b) -> b | _ -> assert false in
-  let bs = List.map get_type vs' in
-  let su' = List.mapi term_var vs' in
-  tvs, vs, bs, subst 0 su' t'
 ;;
 
 let abbrev_term =
@@ -303,12 +167,40 @@ let abbrev_term =
           k
      in
      out oc "(term%d%a%a)"
-       k (list_prefix " " typ) tvs (list_prefix " " raw_term) vs
+       k (list_prefix " " raw_typ) tvs (list_prefix " " raw_term) vs
+;;
+
+(* [rename rmap t] returns a new term obtained from [t] by applying
+   [rmap] and by replacing variables not occurring in [rmap] by the
+   constant [el]. *)
+let rec rename rmap t =
+  match t with
+  | Var(n,b) -> (try mk_var(List.assoc t rmap,b) with Not_found -> mk_el b)
+  | Const(_,_) -> t
+  | Comb(u,v) -> mk_comb(rename rmap u, rename rmap v)
+  | Abs(u,v) ->
+     let rmap' = add_var rmap u in mk_abs(rename rmap' u,rename rmap' v)
 ;;
 
 let term rmap oc t =
   if !use_abbrev then abbrev_term oc (rename rmap t)
   else unabbrev_term rmap oc t
+;;
+
+(* [decl_map_term oc m] outputs on [oc] the term abbreviations defined
+   by [m]. *)
+let decl_map_term oc m =
+  let abbrev (t,(k,n,bs)) =
+    out oc "symbol term%d" k;
+    for i=0 to n-1 do out oc " a%d" i done;
+    (* We can use abbrev_typ here since [bs] are canonical. *)
+    List.iteri (fun i b -> out oc " (x%d: El %a)" i abbrev_typ b) bs;
+    (* We can use [raw_term] here since [t] is canonical. *)
+    out oc " ≔ %a;\n" raw_term t
+  in
+  List.iter abbrev
+    (List.sort (fun (_,(k1,_,_)) (_,(k2,_,_)) -> k1 - k2)
+       (MapTrm.fold (fun b x l -> (b,x)::l) m []))
 ;;
 
 (****************************************************************************)
@@ -426,7 +318,7 @@ let proof tvs rmap =
 ;;
 
 (****************************************************************************)
-(* Functions translating type declarations and axioms. *)
+(* Translation of type declarations and axioms. *)
 (****************************************************************************)
 
 let typ_arity oc k = for i = 1 to k do out oc "Set → " done; out oc "Set";;
@@ -468,7 +360,7 @@ let decl_axioms oc ths =
 ;;
 
 (****************************************************************************)
-(* Lambdapi file generation. *)
+(* Translation of theorems. *)
 (****************************************************************************)
 
 (* [theorem oc k p] outputs on [oc] the proof [p] of index [k]. *)
@@ -519,6 +411,10 @@ print thm_%d;\n" x*)
   | All -> iter_proofs (theorem oc)
   | Inter(x,y) -> for k = x to y do theorem oc k (proof_at k) done
 ;;
+
+(****************************************************************************)
+(* Lambdapi file generation with type and term abbreviations. *)
+(****************************************************************************)
 
 (* [export_to_lp_file f r] creates the files "f_types.lp",
    "f_terms.lp" and "f_theorems.lp" for the theorems in range [r]. *)
@@ -589,6 +485,10 @@ rule El (fun $a $b) ↪ El $a → El $b;
   print_time()
 ;;
 
+(****************************************************************************)
+(* Lambdapi file generation without type and term abbreviations. *)
+(****************************************************************************)
+
 (* [theory oc] outputs on [oc] all types, constants and axioms used in
    proofs. *)
 let theory oc =
@@ -638,12 +538,13 @@ symbol TRANS [a] [x y z : El a] :
 decl_axioms (axioms()) (list decl_def) (definitions())
 ;;
 
-(* [export_to_lp_file_no_abbrev f r] creates a file of name [f] and
+(* [export_to_lp_file_no_abbrev f r] creates a file of name [f.lp] and
    outputs to this file the proofs in range [r]. *)
-let export_to_lp_file_no_abbrev filename r =
+let export_to_lp_file_no_abbrev basename r =
   print_time();
   use_abbrev := false;
   update_map_const_typ_vars_pos();
+  let filename = basename ^ ".lp" in
   log "generate %s ...\n%!" filename;
   let oc = open_out filename in
   theory oc;
@@ -653,10 +554,15 @@ let export_to_lp_file_no_abbrev filename r =
   print_time()
 ;;
 
-(* EXPERIMENTAL. [export_to_lp_dir d r] creates in directory [d] a
-   file for each proof in range [r]. This function is not interesting
-   to use for the moment as checking the generated lp files take more
-   times because of the way loading is currently done in Lambdapi. *)
+(****************************************************************************)
+(* EXPERIMENTAL. Generaton of one file for each theorem (without type
+   and term abbreviations). *)
+(****************************************************************************)
+
+(* [export_to_lp_dir d r] creates in directory [d] a file for each
+   proof in range [r]. This function is not interesting to use for the
+   moment as checking the generated lp files take more times because
+   of the way loading is currently done in Lambdapi. *)
 let export_to_lp_dir dirname r =
   print_time();
   use_abbrev := false;

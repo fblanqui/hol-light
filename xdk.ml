@@ -35,57 +35,93 @@ let name oc n = string oc (valid_name n);;
 
 let suffix s oc n = name oc (n ^ s);;
 
+let prefix s oc n = name oc (s ^ n);;
+
+let typ_name oc n =
+  match !stage with
+  | Types | No_abbrev -> name oc n
+  | _ -> out oc "%s_types.%a" !basename name n
+;;
+
+let cst_name oc n =
+  match !stage with
+  | Terms | No_abbrev -> name oc n
+  | _ -> out oc "%s_terms.%a" !basename name n
+;;
+
 (****************************************************************************)
 (* Translation of types. *)
 (****************************************************************************)
 
 let rec raw_typ oc b =
   match b with
-  | Tyvar n -> out oc "%a" name n
-  | Tyapp(c,[]) -> out oc "%a" name c
-  | Tyapp(c,bs) -> out oc "(%a%a)" name c (list_prefix " " raw_typ) bs
+  | Tyvar n -> name oc n
+  | Tyapp(n,[]) -> typ_name oc n
+  | Tyapp(n,bs) -> out oc "(%a%a)" typ_name n (list_prefix " " raw_typ) bs
 ;;
 
-let subst_typ =
-  olist (fun oc (b,v) -> out oc "%a -> %a" raw_typ v raw_typ b);;
+let unabbrev_typ tvs =
+  let rec typ oc b =
+    match b with
+    | Tyvar n ->
+       if List.mem b tvs then name oc n
+       else out oc "(;%a;)%a" name n typ_name "bool"
+    | Tyapp(n,bs) -> out oc "(%a%a)" typ_name n (list_prefix " " typ) bs
+  in typ
+;;
 
-(* [decl_map_typ oc m] outputs on [oc] the type abbraviations of [m]. *)
+let abbrev_typ =
+  let idx = ref (-1) in
+  fun oc b ->
+  match b with
+  | Tyvar n -> name oc n
+  | Tyapp(n,[]) -> typ_name oc n
+  | _ ->
+     (* check whether the type is already abbreviated; add a new
+        abbreviation if needed *)
+     let tvs, b = canonical_typ b in
+     let k =
+       match MapTyp.find_opt b !map_typ with
+       | Some (k,_) -> k
+       | None ->
+          let k = !idx + 1 in
+          idx := k;
+          let x = (k, List.length tvs) in
+          map_typ := MapTyp.add b x !map_typ;
+          k
+     in
+     match tvs with
+     | [] -> out oc "%a%d" typ_name "type" k
+     | _ -> out oc "(%a%d%a)" typ_name "type" k (list_prefix " " raw_typ) tvs
+;;
+
+let typ tvs oc b =
+  if !use_abbrev then abbrev_typ oc (missing_as_bool tvs b)
+  else unabbrev_typ tvs oc b;;
+
+(* [decl_map_typ oc m] outputs on [oc] the type abbreviations of [m]. *)
 let decl_map_typ oc m =
   let abbrev (b,(k,n)) =
-    out oc "def type%d" k;
-    for i=0 to n-1 do out oc " a%d" i done;
-    out oc " := %a.\n" raw_typ b
+    out oc "def type%d := " k;
+    for i=0 to n-1 do out oc "a%d : %a => " i typ_name "Set" done;
+    (* We can use [raw_type] here because [b] is canonical. *)
+    out oc "%a.\n" raw_typ b
   in
   List.iter abbrev
     (List.sort (fun (_,(k1,_)) (_,(k2,_)) -> k1 - k2)
        (MapTyp.fold (fun b x l -> (b,x)::l) m []))
 ;;
 
-(* [typ tvs oc b] prints on [oc] the type [b]. Type variables not in
-   [tvs] are replaced by [bool]. *)
-let typ tvs =
-  let rec typ oc b =
-    match b with
-    | Tyvar n ->
-       if List.mem b tvs then out oc "%a" name n
-       else out oc "(;%a;)bool" name n
-    | Tyapp(c,[]) -> out oc "%a" name c
-    | Tyapp(c,bs) -> out oc "(%a%a)" name c (list_prefix " " typ) bs
-  in typ
-;;
-
 (****************************************************************************)
-(* Translation of terms. *)
+(* Translation of term variables. *)
 (****************************************************************************)
 
 let raw_var oc t =
   match t with
-  | Var(n,_) -> out oc "%a" name n
+  | Var(n,_) -> name oc n
   | _ -> assert false
 ;;
 
-(* [var rmap oc t] prints on [oc] the variable [t] using the renaming
-   map [rmap]. *)
 let var rmap oc t =
   try name oc (List.assoc t rmap)
   with Not_found -> assert false
@@ -94,9 +130,15 @@ let var rmap oc t =
     | _ -> assert false*)
 ;;
 
+let raw_decl_var oc t =
+  match t with
+  | Var(n,b) -> out oc "%a : %a %a" name n cst_name "El" raw_typ b
+  | _ -> assert false
+;;
+
 let decl_var tvs rmap oc t =
   match t with
-  | Var(_,b) -> out oc "%a : El %a" (var rmap) t (typ tvs) b
+  | Var(_,b) -> out oc "%a : %a %a" (var rmap) t cst_name "El" (typ tvs) b
   | _ -> assert false
 ;;
 
@@ -104,22 +146,45 @@ let decl_param tvs rmap oc v = out oc "%a -> " (decl_var tvs rmap) v;;
 
 let param tvs rmap oc v = out oc "%a => " (decl_var tvs rmap) v;;
 
-(* [term tvs rmap oc t] prints on [oc] the term [t] with type
-   variables [tvs] and term variable renaming map [rmap]. A variable
-   of type b not in [rmap] is replaced by [el b]. *)
-let term tvs =
+(****************************************************************************)
+(* Translation of terms. *)
+(****************************************************************************)
+
+(* [raw_term oc t] prints on [oc] the term [t] as it is, including types. *)
+let raw_term =
+  let rec term oc t =
+    match t with
+    | Var(n,_) -> name oc n
+    | Const(n,b) ->
+       begin match List.map (subtyp b) (const_typ_vars_pos n) with
+       | [] -> out oc "%a" name n
+       | bs -> out oc "(%a%a)" name n (list_prefix " " raw_typ) bs
+       end
+    | Comb(_,_) ->
+       let h, ts = head_args t in
+       out oc "(%a%a)" term h (list_prefix " " term) ts
+    | Abs(u,v) ->
+       out oc "(%a => %a)" raw_decl_var u term v
+  in term
+;;
+
+(* [unabbrev_term tvs rmap oc t] prints on [oc] the term [t] with type
+   variables [tvs] and term variable renaming map [rmap], without
+   using term abbreviations. A variable of type b not in [rmap] is
+   replaced by [el b]. *)
+let unabbrev_term tvs =
   let typ = typ tvs in
   let rec term rmap oc t =
     match t with
     | Var(n,b) ->
        begin
          try name oc (List.assoc t rmap)
-         with Not_found -> out oc "(;%a;)(el %a)" name n typ b
+         with Not_found -> out oc "(;%a;)(%a %a)" name n cst_name "el" typ b
        end
     | Const(n,b) ->
        begin match List.map (subtyp b) (const_typ_vars_pos n) with
-       | [] -> out oc "%a" name n
-       | bs -> out oc "(%a%a)" name n (list_prefix " " typ) bs
+       | [] -> cst_name oc n
+       | bs -> out oc "(%a%a)" cst_name n (list_prefix " " typ) bs
        end
     | Comb(_,_) ->
        let h, ts = head_args t in
@@ -130,11 +195,83 @@ let term tvs =
   in term
 ;;
 
-(* for debug *)
+let abbrev_term =
+  let idx = ref (-1) in
+  fun tvs oc t ->
+  match t with
+  | Var(n,_) -> name oc n
+  | Const(n,b) ->
+     begin match List.map (subtyp b) (const_typ_vars_pos n) with
+     | [] -> cst_name oc n
+     | bs -> out oc "(%a%a)" cst_name n (list_prefix " " (typ tvs)) bs
+     end
+  | _ ->
+     (* check whether the term is already abbreviated; add a new
+        abbreviation if needed *)
+     let tvs, vs, bs, t = canonical_term t in
+     let k =
+       match MapTrm.find_opt t !map_term with
+       | Some (k,_,_) -> k
+       | None ->
+          let k = !idx + 1 in
+          idx := k;
+          let x = (k, List.length tvs, bs) in
+          map_term := MapTrm.add t x !map_term;
+          k
+     in
+     out oc "(%a%d%a%a)" cst_name "term" k
+       (list_prefix " " raw_typ) tvs (list_prefix " " raw_var) vs
+;;
 
-let subst_term tvs rmap =
-  list_sep "; "
-    (fun oc (t,v) -> out oc "%a -> %a" raw_var v (term tvs rmap) t);;
+(* [subst_missing_as_bool] returns a type substitution mapping every
+   type variable of [b] not in [yvs] to bool. *)
+let subst_missing_as_bool tvs b =
+  (*List.map (fun tv -> (bool_ty, tv))
+    (List.filter (fun tv -> not (List.mem tv tvs)) (tyvars b))*)
+  List.filter_map
+    (fun tv -> if List.mem tv tvs then None else Some(bool_ty, tv))
+    (tyvars b)
+;;
+
+(* [rename tvs rmap t] returns a new term obtained from [t] by applying
+   [rmap] and by replacing variables not occurring in [rmap] by the
+   constant [el], and type variables not occurring in [tvs] by bool. *)
+let rename tvs =
+  let rec rename rmap t =
+    match t with
+    | Var(_,b) ->
+       let b = missing_as_bool tvs b in
+       (try mk_var(List.assoc t rmap, b) with Not_found -> mk_el b)
+    | Const(_,b) ->
+       let su = subst_missing_as_bool tvs b in
+       if su = [] then t else inst su t
+    | Comb(u,v) -> mk_comb(rename rmap u, rename rmap v)
+    | Abs(u,v) ->
+       let rmap' = add_var rmap u in mk_abs(rename rmap' u,rename rmap' v)
+  in rename
+;;
+
+let term tvs rmap oc t =
+  if !use_abbrev then abbrev_term tvs oc (rename tvs rmap t)
+  else unabbrev_term tvs rmap oc t
+;;
+
+(* [decl_map_term oc m] outputs on [oc] the term abbreviations defined
+   by [m]. *)
+let decl_map_term oc m =
+  let abbrev (t,(k,n,bs)) =
+    out oc "def term%d := " k;
+    for i=0 to n-1 do out oc "a%d : %a => " i typ_name "Set" done;
+    (* We can use abbrev_typ here since [bs] are canonical. *)
+    List.iteri
+      (fun i b -> out oc "x%d: %a %a => " i cst_name "El" abbrev_typ b) bs;
+    (* We can use [raw_term] here since [t] is canonical. *)
+    out oc "%a.\n" raw_term t
+  in
+  List.iter abbrev
+    (List.sort (fun (_,(k1,_,_)) (_,(k2,_,_)) -> k1 - k2)
+       (MapTrm.fold (fun b x l -> (b,x)::l) m []))
+;;
 
 (****************************************************************************)
 (* Translation of proofs. *)
@@ -274,21 +411,23 @@ let proof tvs rmap =
 ;;
 
 (****************************************************************************)
-(* Functions translating type declarations and axioms. *)
+(* Translation of type declarations and axioms. *)
 (****************************************************************************)
 
-let typ_arity oc k = for i = 1 to k do out oc "Set -> " done; out oc "Set";;
+let typ_arity oc k =
+  for i = 1 to k do out oc "%a -> " typ_name "Set" done; typ_name oc "Set";;
 
 let decl_typ oc (n,k) =
   out oc "%a : %a.\n" name n typ_arity k;;
 
-let decl_typ_param tvs oc b = out oc "%a : Set -> " (typ tvs) b;;
+let decl_typ_param tvs oc b = out oc "%a : %a -> " (typ tvs) b typ_name "Set";;
 
-let typ_param tvs oc b = out oc "%a : Set => " (typ tvs) b;;
+let typ_param tvs oc b = out oc "%a : %a => " (typ tvs) b typ_name "Set";;
 
 let decl_sym oc (n,b) =
   let tvs = tyvars b in
-  out oc "%a : %aEl %a.\n" name n (list (decl_typ_param tvs)) tvs (typ tvs) b
+  out oc "%a : %a%a %a.\n"
+    name n (list (decl_typ_param tvs)) tvs cst_name "El" (unabbrev_typ tvs) b
 ;;
 
 let decl_def oc th =
@@ -299,7 +438,7 @@ let decl_def oc th =
      let tvs = type_vars_in_term t in
      out oc "%a : %aPrf %a.\n" (suffix "_def") n
        (list (decl_typ_param tvs)) tvs
-       (term tvs rmap) t
+       (unabbrev_term tvs rmap) t
   | _ -> assert false
 ;;
 
@@ -311,62 +450,14 @@ let decl_axioms oc ths =
     let tvs = type_vars_in_term t in
     out oc "def axiom_%d : %a%aPrf %a.\n" i
       (list (decl_typ_param tvs)) tvs  (list (decl_param tvs rmap)) xs
-      (term tvs rmap) t
+      (unabbrev_term tvs rmap) t
   in
   List.iteri axiom ths
 ;;
 
 (****************************************************************************)
-(* Lambdapi file generation. *)
+(* Translation of theorems. *)
 (****************************************************************************)
-
-let prelude = "(; Encoding of simple type theory ;)
-Set : Type.
-bool : Set.
-fun : Set -> Set -> Set.
-injective El : Set -> Type.
-[a, b] El (fun a b) --> El a -> El b.
-injective Prf : El bool -> Type.
-
-(; HOL-Light axioms and rules ;)
-el : a : Set -> El a.
-eq : a : Set -> El a -> El a -> El bool.
-def fun_ext : a : Set -> b : Set -> f : El (fun a b) -> g : El (fun a b) ->
-  (x : El a -> Prf (eq b (f x) (g x))) -> Prf (eq (fun a b) f g).
-def prop_ext : p : El bool -> q : El bool ->
-  (Prf p -> Prf q) -> (Prf q -> Prf p) -> Prf (eq bool p q).
-def REFL : a : Set -> t : El a -> Prf (eq a t t).
-def MK_COMB : a : Set -> b : Set -> s : El (fun a b) -> t : El (fun a b) ->
-  u : El a -> v : El a -> Prf(eq (fun a b) s t) -> Prf(eq a u v) ->
-  Prf (eq b (s u) (t v)).
-def EQ_MP : p : El bool -> q : El bool -> Prf(eq bool p q) -> Prf p -> Prf q.
-thm TRANS : a : Set -> x : El a -> y : El a -> z : El a ->
-  Prf (eq a x y) -> Prf (eq a y z) -> Prf (eq a x z) :=
-  a: Set => x: El a => y: El a => z: El a =>
-  xy: Prf (eq a x y) => yz: Prf (eq a y z) =>
-  EQ_MP (eq a x y) (eq a x z)
-    (MK_COMB a bool (eq a x) (eq a x) y z
-       (REFL (fun a bool) (eq a x)) yz) xy.
-";;
-
-let theory oc =
-  let f (n,_) = match n with "bool" | "fun" -> false | _ -> true in
-  let types = List.filter f (types()) in
-  let f (n,_) = match n with "=" | "el" -> false | _ -> true in
-  let constants = List.filter f (constants()) in
-  out oc
-"%s
-(; types ;)
-%a
-(; constants ;)
-%a
-(; axioms ;)
-%a
-(; definitions ;)
-%a\n"
-    prelude (list decl_typ) types (list decl_sym) constants
-    decl_axioms (axioms()) (list decl_def) (definitions())
-;;
 
 (* [theorem_as_axiom oc k p] outputs on [oc] the proof [p] of index [k]. *)
 let theorem oc k p =
@@ -418,11 +509,170 @@ let proofs_in_range oc = function
   | Inter(x,y) -> for k = x to y do theorem oc k (proof_at k) done
 ;;
 
-(* [export_to_dk_file f r] creates a file of name [f] and outputs to this
-   file the proofs in range [r]. *)
-let export_to_dk_file filename r =
-  print_time();
+(****************************************************************************)
+(* Generation of the encoding symbols. *)
+(****************************************************************************)
+
+let qualify_types s =
+  let re = Str.regexp "\\(Set\\|bool\\)" in
+  let r = !basename ^ "_types.\1" in
+  let s = Str.global_replace re r s in
+  let re = Str.regexp "fun\\([^_]\\)" in
+  let r = !basename ^ "_types.fun\1" in
+  Str.global_replace re r s
+;;
+
+let qualify_terms s =
+  let re = Str.regexp "\\(El\\|eq\\)" in
+  let r = !basename ^ "_terms.\1" in
+  Str.global_replace re r (qualify_types s)
+;;
+
+let decl_Prf() = qualify_terms "injective Prf : El bool -> Type.";;
+
+let decl_El() = qualify_types
+"injective El : Set -> Type.
+[a, b] El (fun a b) --> El a -> El b.";;
+
+let decl_rules() = qualify_terms
+"def fun_ext : a : Set -> b : Set -> f : El (fun a b) -> g : El (fun a b) ->
+  (x : El a -> Prf (eq b (f x) (g x))) -> Prf (eq (fun a b) f g).
+def prop_ext : p : El bool -> q : El bool ->
+  (Prf p -> Prf q) -> (Prf q -> Prf p) -> Prf (eq bool p q).
+def REFL : a : Set -> t : El a -> Prf (eq a t t).
+def MK_COMB : a : Set -> b : Set -> s : El (fun a b) -> t : El (fun a b) ->
+  u : El a -> v : El a -> Prf(eq (fun a b) s t) -> Prf(eq a u v) ->
+  Prf (eq b (s u) (t v)).
+def EQ_MP : p : El bool -> q : El bool -> Prf(eq bool p q) -> Prf p -> Prf q.
+thm TRANS : a : Set -> x : El a -> y : El a -> z : El a ->
+  Prf (eq a x y) -> Prf (eq a y z) -> Prf (eq a x z) :=
+  a: Set => x: El a => y: El a => z: El a =>
+  xy: Prf (eq a x y) => yz: Prf (eq a y z) =>
+  EQ_MP (eq a x y) (eq a x z)
+    (MK_COMB a bool (eq a x) (eq a x) y z
+      (REFL (fun a bool) (eq a x)) yz) xy."
+;;
+
+(****************************************************************************)
+(* Dedukti file generation with type and term abbreviations. *)
+(****************************************************************************)
+
+(* [export_to_dk_file f r] creates the files "f_types.dk", "f_terms.dk"
+   and "f_theorems.dk" for the theorems in range [r]. *)
+let export_to_dk_file f r =
+  basename := f;
+  reset_map_typ();
+  reset_map_term();
   update_map_const_typ_vars_pos();
+  print_time();
+  (* generate axioms and theorems *)
+  let filename = f ^ "_proofs.dk" in
+  log "generate %s ...\n%!" filename;
+  let oc = open_out filename in
+  stage := Proofs;
+  out oc
+"#REQUIRE %s_types.
+#REQUIRE %s_terms.\n
+%s\n
+(; axioms ;)
+%a
+(; rules ;)
+%s
+(; definitional axioms ;)
+%a
+(; theorems ;)
+%a" f f (decl_Prf())
+decl_axioms (axioms()) (decl_rules()) (list decl_def) (definitions())
+proofs_in_range r;
+  close_out oc;
+  (* generate constants and term abbreviations *)
+  let filename = f ^ "_terms.dk" in
+  log "generate %s ...\n%!" filename;
+  let oc = open_out filename in
+  stage := Terms;
+  out oc
+"#REQUIRE %s_types.\n
+%s\n
+(; constants ;)
+%a
+(; term abbreviations ;)
+%a" f (decl_El()) (list decl_sym) (constants()) decl_map_term !map_term;
+  close_out oc;
+  (* generate types and type abbreviations *)
+  let filename = f ^ "_types.dk" in
+  log "generate %s ...\n%!" filename;
+  let oc = open_out filename in
+  stage := Types;
+  out oc
+"Set : Type.\n
+(; types ;)
+%a
+(; type abbreviations ;)
+%a" (list decl_typ) (types()) decl_map_typ !map_typ;
+  close_out oc;
+  print_time()
+;;
+
+(****************************************************************************)
+(* Dedukti file generation without type and term abbreviations. *)
+(****************************************************************************)
+
+(* [theory oc] outputs on [oc] all types, constants and axioms used in
+   proofs. *)
+let theory oc =
+  let f (n,_) = match n with "bool" | "fun" -> false | _ -> true in
+  let types = List.filter f (types()) in
+  let f (n,_) = match n with "=" | "el" -> false | _ -> true in
+  let constants = List.filter f (constants()) in
+  out oc
+"(; Encoding of simple type theory ;)
+Set : Type.
+bool : Set.
+fun : Set -> Set -> Set.
+injective El : Set -> Type.
+[a, b] El (fun a b) --> El a -> El b.
+injective Prf : El bool -> Type.
+
+(; HOL-Light axioms and rules ;)
+el : a : Set -> El a.
+eq : a : Set -> El a -> El a -> El bool.
+def fun_ext : a : Set -> b : Set -> f : El (fun a b) -> g : El (fun a b) ->
+  (x : El a -> Prf (eq b (f x) (g x))) -> Prf (eq (fun a b) f g).
+def prop_ext : p : El bool -> q : El bool ->
+  (Prf p -> Prf q) -> (Prf q -> Prf p) -> Prf (eq bool p q).
+def REFL : a : Set -> t : El a -> Prf (eq a t t).
+def MK_COMB : a : Set -> b : Set -> s : El (fun a b) -> t : El (fun a b) ->
+  u : El a -> v : El a -> Prf(eq (fun a b) s t) -> Prf(eq a u v) ->
+  Prf (eq b (s u) (t v)).
+def EQ_MP : p : El bool -> q : El bool -> Prf(eq bool p q) -> Prf p -> Prf q.
+thm TRANS : a : Set -> x : El a -> y : El a -> z : El a ->
+  Prf (eq a x y) -> Prf (eq a y z) -> Prf (eq a x z) :=
+  a: Set => x: El a => y: El a => z: El a =>
+  xy: Prf (eq a x y) => yz: Prf (eq a y z) =>
+  EQ_MP (eq a x y) (eq a x z)
+    (MK_COMB a bool (eq a x) (eq a x) y z
+       (REFL (fun a bool) (eq a x)) yz) xy.
+
+(; types ;)
+%a
+(; constants ;)
+%a
+(; axioms ;)
+%a
+(; definitions ;)
+%a\n"
+(list decl_typ) types (list decl_sym) constants
+decl_axioms (axioms()) (list decl_def) (definitions())
+;;
+
+(* [export_to_dk_file_no_abbrev f r] creates a file of name [f.dk] and
+   outputs to this file the proofs in range [r]. *)
+let export_to_dk_file_no_abbrev basename r =
+  print_time();
+  use_abbrev := false;
+  stage := No_abbrev;
+  update_map_const_typ_vars_pos();
+  let filename = basename ^ ".dk" in
   log "generate %s ...\n%!" filename;
   let oc = open_out filename in
   theory oc;

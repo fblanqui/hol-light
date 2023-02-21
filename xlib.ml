@@ -61,81 +61,20 @@ let hstats oc ht =
 ;;
 
 (****************************************************************************)
-(* Functions on types and terms. *)
+(* Functions on types. *)
 (****************************************************************************)
 
-(* Sets and maps on types. *)
-module OrdTyp = struct type t = hol_type let compare = compare end;;
-module SetTyp = Set.Make(OrdTyp);;
-module MapTyp = Map.Make(OrdTyp);;
-
-(* Sets and maps on terms. *)
-module OrdTrm = struct type t = term let compare = compare end;;
-module MapTrm = Map.Make(OrdTrm);;
-module SetTrm = Set.Make(OrdTrm);;
-
-(* Printing functions for debug. *)
+(* Printing function for debug. *)
 let rec otyp oc b =
   match b with
   | Tyvar n -> out oc "(Tyvar %s)" n
   | Tyapp(n,bs) -> out oc "Tyapp(%s,%a)" n (olist otyp) bs
 ;;
 
-let rec oterm oc t =
-  match t with
-  | Var(n,b) -> out oc "Var(%s,%a)" n otyp b
-  | Const(n,b) -> out oc "Const(%s,%a)" n otyp b
-  | Comb(u,v) -> out oc "Comb(%a,%a)" oterm u oterm v
-  | Abs(u,v) -> out oc "Abs(%a,%a)" oterm u oterm v
-;;
-
-(* [head_args t] returns the pair [h,ts] such that [t] is of the t is
-   the Comb application of [h] to [ts]. *)
-let head_args =
-  let rec aux acc t =
-    match t with
-    | Comb(t1,t2) -> aux (t2::acc) t1
-    | _ -> t, acc
-  in aux []
-;;
-
-(* [get_eq_typ p] returns the type [b] of the terms t and u of the
-   conclusion of the proof [p] assumed of the form [= t u]. *)
-let get_eq_typ p =
-  let Proof(th,_) = p in
-  match concl th with
-  | Comb(Comb(Const("=",Tyapp("fun",[b;_])),_),_) -> b
-  | _ -> assert false
-;;
-
-(* [get_eq_args p] returns the terms t and u of the conclusion of the
-   proof [p] assumed of the form [= t u]. *)
-let get_eq_args p =
-  let Proof(th,_) = p in
-  match concl th with
-  | Comb(Comb(Const("=",_),t),u) -> t,u
-  | _ -> let t = mk_var("error",bool_ty) in t,t (*assert false*)
-;;
-
-(* [get_eq_typ_args p] returns the type of the terms t and u, and the
-   terms t and u, of the conclusion of the proof [p] assumed of the
-   form [= t u]. *)
-let get_eq_typ_args p =
-  let Proof(th,_) = p in
-  match concl th with
-  | Comb(Comb(Const("=",Tyapp("fun",[b;_])),t),u) -> b,t,u
-  | _ -> assert false
-;;
-
-(* [index t ts] returns the position (counting from 0) of the first
-   element of [ts] alpha-equivalent to [t]. Raises Not_found if there
-   is no such term. *)
-let index t =
-  try pos_first (fun u -> alphaorder t u = 0)
-  with Not_found -> assert false;;
-
-(* [vsubstl s ts] applies the substitution [s] to each term of [ts]. *)
-let vsubstl s ts = if s = [] then ts else List.map (vsubst s) ts;;
+(* Sets and maps on types. *)
+module OrdTyp = struct type t = hol_type let compare = compare end;;
+module SetTyp = Set.Make(OrdTyp);;
+module MapTyp = Map.Make(OrdTyp);;
 
 (* It is important for the export that list of type variables and term
    free variables are always ordered and have no duplicate. *)
@@ -150,6 +89,94 @@ let tyvarsl bs =
 (* Redefinition of [tyvars] so that the output is sorted and has no
    duplicate. *)
 let tyvars b = List.sort_uniq compare (tyvars b);;
+
+(* [missing_as_bool tvs b] replaces in [b] every type variable not in
+   [tvs]. *)
+let missing_as_bool tvs =
+  let rec typ b =
+    match b with
+    | Tyvar _ -> if List.mem b tvs then b else bool_ty
+    | Tyapp(n,bs) -> mk_type(n, List.map typ bs)
+  in typ
+;;
+
+(* [canonical_typ b] returns the type variables of [b] together with a
+   type alpha-equivalent to any type alpha-equivalent to [b]. *)
+let canonical_typ =
+  let type_var i tv = mk_vartype ("a" ^ string_of_int i), tv in
+  fun b ->
+  let tvs = tyvars b in
+  tvs, type_subst (List.mapi type_var tvs) b
+;;
+
+(* Subterm positions in types are represented as list of natural numbers. *)
+
+(* [subtyp b p] returns the type at position [p] in the type [b]. *)
+let rec subtyp b p =
+  match b, p with
+  | _, [] -> b
+  | Tyapp(_, bs), p::ps -> subtyp (List.nth bs p) ps
+  | _ -> invalid_arg "subtyp"
+;;
+
+(* [typ_vars_pos b] returns an association list mapping every type
+   variable occurrence to its posiion in [b]. *)
+let typ_vars_pos b =
+  let rec aux acc l =
+    match l with
+    | [] -> acc
+    | (Tyvar n, p)::l -> aux ((n, List.rev p)::acc) l
+    | (Tyapp(n,bs), p)::l ->
+       aux acc
+         (let k = ref (-1) in
+          List.fold_left
+            (fun l b -> incr k; (b,!k::p)::l)
+            l bs)
+  in aux [] [b,[]]
+;;
+
+(* test:
+typ_vars_pos
+  (mk_type("fun",[mk_vartype"a"
+                 ;mk_type("fun",[mk_vartype"a";mk_vartype"b"])]));;*)
+
+(****************************************************************************)
+(* Functions on terms. *)
+(****************************************************************************)
+
+(* Printing function for debug. *)
+let rec oterm oc t =
+  match t with
+  | Var(n,b) -> out oc "Var(%s,%a)" n otyp b
+  | Const(n,b) -> out oc "Const(%s,%a)" n otyp b
+  | Comb(u,v) -> out oc "Comb(%a,%a)" oterm u oterm v
+  | Abs(u,v) -> out oc "Abs(%a,%a)" oterm u oterm v
+;;
+
+(* Sets and maps on terms. *)
+module OrdTrm = struct type t = term let compare = compare end;;
+module MapTrm = Map.Make(OrdTrm);;
+module SetTrm = Set.Make(OrdTrm);;
+
+(* [head_args t] returns the pair [h,ts] such that [t] is of the t is
+   the Comb application of [h] to [ts]. *)
+let head_args =
+  let rec aux acc t =
+    match t with
+    | Comb(t1,t2) -> aux (t2::acc) t1
+    | _ -> t, acc
+  in aux []
+;;
+
+(* [index t ts] returns the position (counting from 0) of the first
+   element of [ts] alpha-equivalent to [t]. Raises Not_found if there
+   is no such term. *)
+let index t =
+  try pos_first (fun u -> alphaorder t u = 0)
+  with Not_found -> assert false;;
+
+(* [vsubstl s ts] applies the substitution [s] to each term of [ts]. *)
+let vsubstl s ts = if s = [] then ts else List.map (vsubst s) ts;;
 
 (* [type_vars_in_terms ts] returns the ordered list with no duplicate
    of type variables occurring in the list of terms [ts]. *)
@@ -214,52 +241,73 @@ if not(!el_added) then (new_constant("el",aty); el_added := true);;
 
 let mk_el b = mk_const("el",[b,aty]);;
 
-(* [rename rmap t] returns a new term obtained from [t] by applying
-   [rmap] and by replacing variables not occurring in [rmap] by the
-   constant [el]. *)
-let rec rename rmap t =
-  match t with
-  | Var(n,b) -> (try mk_var(List.assoc t rmap,b) with Not_found -> mk_el b)
-  | Const(_,_) -> t
-  | Comb(u,v) -> mk_comb(rename rmap u, rename rmap v)
-  | Abs(u,v) ->
-     let rmap' = add_var rmap u in mk_abs(rename rmap' u,rename rmap' v)
+(* [canonical_term t] returns the type variables and term variables of
+   [t] together with a term alpha-equivalent to any term
+   alpha-equivalent to [t]. *)
+let canonical_term =
+  let type_var i tv = mk_vartype ("a" ^ string_of_int i), tv in
+  let term_var i v =
+    match v with
+    | Var(_,b) -> v, mk_var ("x" ^ string_of_int i, b)
+    | _ -> assert false
+  in
+  (* [subst i su t] applies [su] on [t] and rename abstracted
+     variables as well by using [i]. *)
+  let rec subst i su t =
+    (*log "subst %d %a %a\n%!" i (olist (opair oterm oterm)) su oterm t;*)
+    match t with
+    | Var _ -> (try List.assoc t su with Not_found -> assert false)
+    | Const _ -> t
+    | Comb(u,v) -> mk_comb(subst i su u, subst i su v)
+    | Abs(u,v) ->
+       match u with
+       | Var(_,b) ->
+          let u' = mk_var ("y" ^ string_of_int i, b) in
+          mk_abs(u', subst (i+1) ((u,u')::su) v)
+       | _ -> assert false
+  in
+  fun t ->
+  let tvs = type_vars_in_term t and vs = frees t in
+  let su = List.mapi type_var tvs in
+  let t' = inst su t in
+  let vs' = List.map (inst su) vs in
+  let get_type = function Var(_,b) -> b | _ -> assert false in
+  let bs = List.map get_type vs' in
+  let su' = List.mapi term_var vs' in
+  tvs, vs, bs, subst 0 su' t'
 ;;
-
-(* Subterm positions in types are represented as list of natural numbers. *)
-
-(* [subtyp b p] returns the type at position [p] in the type [b]. *)
-let rec subtyp b p =
-  match b, p with
-  | _, [] -> b
-  | Tyapp(_, bs), p::ps -> subtyp (List.nth bs p) ps
-  | _ -> invalid_arg "subtyp"
-;;
-
-(* [typ_vars_pos b] returns an association list mapping every type
-   variable occurrence to its posiion in [b]. *)
-let typ_vars_pos b =
-  let rec aux acc l =
-    match l with
-    | [] -> acc
-    | (Tyvar n, p)::l -> aux ((n, List.rev p)::acc) l
-    | (Tyapp(n,bs), p)::l ->
-       aux acc
-         (let k = ref (-1) in
-          List.fold_left
-            (fun l b -> incr k; (b,!k::p)::l)
-            l bs)
-  in aux [] [b,[]]
-;;
-
-(* test:
-typ_vars_pos
-  (mk_type("fun",[mk_vartype"a"
-                 ;mk_type("fun",[mk_vartype"a";mk_vartype"b"])]));;*)
 
 (****************************************************************************)
 (* Functions on proofs. *)
 (****************************************************************************)
+
+(* [get_eq_typ p] returns the type [b] of the terms t and u of the
+   conclusion of the proof [p] assumed of the form [= t u]. *)
+let get_eq_typ p =
+  let Proof(th,_) = p in
+  match concl th with
+  | Comb(Comb(Const("=",Tyapp("fun",[b;_])),_),_) -> b
+  | _ -> assert false
+;;
+
+(* [get_eq_args p] returns the terms t and u of the conclusion of the
+   proof [p] assumed of the form [= t u]. *)
+let get_eq_args p =
+  let Proof(th,_) = p in
+  match concl th with
+  | Comb(Comb(Const("=",_),t),u) -> t,u
+  | _ -> let t = mk_var("error",bool_ty) in t,t (*assert false*)
+;;
+
+(* [get_eq_typ_args p] returns the type of the terms t and u, and the
+   terms t and u, of the conclusion of the proof [p] assumed of the
+   form [= t u]. *)
+let get_eq_typ_args p =
+  let Proof(th,_) = p in
+  match concl th with
+  | Comb(Comb(Const("=",Tyapp("fun",[b;_])),t),u) -> b,t,u
+  | _ -> assert false
+;;
 
 (* [deps p] returns the list of proof indexes the proof [p] depends on. *)
 let deps p =

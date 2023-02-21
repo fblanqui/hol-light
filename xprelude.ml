@@ -62,5 +62,15 @@ let map_file_thms = ref MapStr.empty;;
    files, that is, the map from file names to their dependencies. *)
 let map_file_deps = ref MapStr.empty;;
 
-(* [el_added] indicates whether the constant "el" has been added. *)
-let el_added = ref false;
+(* indicates whether the constant "el" has been added. *)
+let el_added = ref false;;
+
+(* indicates whether type and term abbreviations should be used. *)
+let use_abbrev = ref true;;
+
+(* file basename for dk output. *)
+let basename = ref "foo";;
+
+(* indicates whether names must be qualified. *)
+type stage = Types | Terms | Proofs | No_abbrev;;
+let stage = ref No_abbrev;;
