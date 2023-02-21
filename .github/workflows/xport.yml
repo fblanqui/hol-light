@@ -30,7 +30,9 @@ jobs:
           eval `opam env`
           make
           ./hol2dk xci.ml 148587
-          dk check xci_types.dk xci_terms.dk xci_proofs.dk
+          dk check -e xci_types.dk
+          dk check -e xci_terms.dk
+          dk check xci_proofs.dk
       - name: Generate and check lp output
         run: |
           eval `opam env`
