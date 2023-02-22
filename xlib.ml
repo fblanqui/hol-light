@@ -140,6 +140,14 @@ typ_vars_pos
   (mk_type("fun",[mk_vartype"a"
                  ;mk_type("fun",[mk_vartype"a";mk_vartype"b"])]));;*)
 
+(* [get_domain ty] returns the domain of [ty], assuming that [ty] is
+   of the form [Tyapp("fun",_)]. *)
+let get_domain ty =
+  match ty with
+  | Tyapp("fun",[b;_]) -> b
+  | _ -> invalid_arg "get_domain"
+;;
+
 (****************************************************************************)
 (* Functions on terms. *)
 (****************************************************************************)
@@ -286,7 +294,7 @@ let canonical_term =
 let get_eq_typ p =
   let Proof(th,_) = p in
   match concl th with
-  | Comb(Comb(Const("=",Tyapp("fun",[b;_])),_),_) -> b
+  | Comb(Comb(Const("=",b),_),_) -> get_domain b
   | _ -> assert false
 ;;
 
@@ -296,7 +304,7 @@ let get_eq_args p =
   let Proof(th,_) = p in
   match concl th with
   | Comb(Comb(Const("=",_),t),u) -> t,u
-  | _ -> let t = mk_var("error",bool_ty) in t,t (*assert false*)
+  | _ -> assert false
 ;;
 
 (* [get_eq_typ_args p] returns the type of the terms t and u, and the
@@ -305,7 +313,7 @@ let get_eq_args p =
 let get_eq_typ_args p =
   let Proof(th,_) = p in
   match concl th with
-  | Comb(Comb(Const("=",Tyapp("fun",[b;_])),t),u) -> b,t,u
+  | Comb(Comb(Const("=",b),t),u) -> get_domain b,t,u
   | _ -> assert false
 ;;
 

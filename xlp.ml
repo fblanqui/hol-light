@@ -148,26 +148,29 @@ let unabbrev_term =
 
 let abbrev_term =
   let idx = ref (-1) in
+  let abbrev oc t =
+    (* check whether the term is already abbreviated; add a new
+       abbreviation if needed *)
+    let tvs, vs, bs, t = canonical_term t in
+    let k =
+      match MapTrm.find_opt t !map_term with
+      | Some (k,_,_) -> k
+      | None ->
+         let k = !idx + 1 in
+         idx := k;
+         let x = (k, List.length tvs, bs) in
+         map_term := MapTrm.add t x !map_term;
+         k
+    in
+    out oc "(term%d%a%a)"
+      k (list_prefix " " raw_typ) tvs (list_prefix " " raw_term) vs
+  in
   fun oc t ->
   match t with
   | Var _
   | Const _ -> raw_term oc t
-  | _ ->
-     (* check whether the term is already abbreviated; add a new
-        abbreviation if needed *)
-     let tvs, vs, bs, t = canonical_term t in
-     let k =
-       match MapTrm.find_opt t !map_term with
-       | Some (k,_,_) -> k
-       | None ->
-          let k = !idx + 1 in
-          idx := k;
-          let x = (k, List.length tvs, bs) in
-          map_term := MapTrm.add t x !map_term;
-          k
-     in
-     out oc "(term%d%a%a)"
-       k (list_prefix " " raw_typ) tvs (list_prefix " " raw_term) vs
+  | Comb(Comb(Const("=",b),u),v) -> out oc "(= %a %a)" abbrev u abbrev v
+  | _ -> abbrev oc t
 ;;
 
 (* [rename rmap t] returns a new term obtained from [t] by applying

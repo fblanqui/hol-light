@@ -195,6 +195,23 @@ let unabbrev_term tvs =
 
 let abbrev_term =
   let idx = ref (-1) in
+  let abbrev oc t =
+    (* check whether the term is already abbreviated; add a new
+       abbreviation if needed *)
+    let tvs, vs, bs, t = canonical_term t in
+    let k =
+      match MapTrm.find_opt t !map_term with
+      | Some (k,_,_) -> k
+      | None ->
+         let k = !idx + 1 in
+         idx := k;
+         let x = (k, List.length tvs, bs) in
+         map_term := MapTrm.add t x !map_term;
+         k
+    in
+    out oc "(%a%d%a%a)" cst_name "term" k
+      (list_prefix " " raw_typ) tvs (list_prefix " " raw_var) vs
+  in
   fun tvs oc t ->
   match t with
   | Var(n,_) -> name oc n
@@ -203,22 +220,9 @@ let abbrev_term =
      | [] -> cst_name oc n
      | bs -> out oc "(%a%a)" cst_name n (list_prefix " " (typ tvs)) bs
      end
-  | _ ->
-     (* check whether the term is already abbreviated; add a new
-        abbreviation if needed *)
-     let tvs, vs, bs, t = canonical_term t in
-     let k =
-       match MapTrm.find_opt t !map_term with
-       | Some (k,_,_) -> k
-       | None ->
-          let k = !idx + 1 in
-          idx := k;
-          let x = (k, List.length tvs, bs) in
-          map_term := MapTrm.add t x !map_term;
-          k
-     in
-     out oc "(%a%d%a%a)" cst_name "term" k
-       (list_prefix " " raw_typ) tvs (list_prefix " " raw_var) vs
+  | Comb(Comb(Const("=",b),u),v) ->
+     out oc "(eq %a %a %a)" (typ tvs) (get_domain b) abbrev u abbrev v
+  | _ -> abbrev oc t
 ;;
 
 (* [subst_missing_as_bool] returns a type substitution mapping every
