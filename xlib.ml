@@ -148,6 +148,15 @@ let get_domain ty =
   | _ -> invalid_arg "get_domain"
 ;;
 
+(* [arity b] returns the number of arguments a term of type [b] can take. *)
+let arity =
+  let rec arity acc b =
+    match b with
+    | Tyapp("fun",[_;b]) -> arity (1+acc) b
+    | _ -> acc
+  in arity 0
+;;
+
 (****************************************************************************)
 (* Functions on terms. *)
 (****************************************************************************)

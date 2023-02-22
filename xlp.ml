@@ -112,17 +112,29 @@ let decl_param rmap oc v = out oc " (%a)" (decl_var rmap) v;;
 
 let rec raw_term oc t =
   match t with
-  | Var(n,b) -> name oc n
-  | Const(c,b) ->
-     begin match List.map (subtyp b) (const_typ_vars_pos c) with
-     | [] -> out oc "%a" name c
-     | bs -> out oc "(@%a%a)" name c (list_prefix " " typ) bs
+  | Var(n,_) -> name oc n
+  | Const(n,b) ->
+     begin match const_typ_vars_pos n with
+     | [] -> name oc n
+     | ps ->
+        let typ_args oc ps =
+          List.iter (fun p -> out oc " %a" typ (subtyp b p)) ps in
+        out oc "(@%a%a)" name n typ_args ps
      end
-  | Comb(_,_) -> (*out oc "(%a %a)" (term rmap) t1 (term rmap) t2*)
+  | Comb(u,v) ->
      let h, ts = head_args t in
      out oc "(%a%a)" raw_term h (list_prefix " " raw_term) ts
-  | Abs(t,u) ->
-     out oc "(λ %a, %a)" raw_decl_var t raw_term u
+     (*begin match h with
+     | Const(n,b) ->
+        let k = if n = "=" then 2 else arity b in
+        if List.compare_length_with ts k < 0 then
+          out oc "(@%a%a%a)" name n
+            (list_prefix " " typ) (List.map (subtyp b) (const_typ_vars_pos n))
+            (list_prefix " " raw_term) ts
+        else out oc "(%a%a)" name n (list_prefix " " raw_term) ts
+     | _ -> out oc "(%a%a)" raw_term h (list_prefix " " raw_term) ts
+     end*)
+  | Abs(u,v) -> out oc "(λ %a, %a)" raw_decl_var u raw_term v
 ;;
 
 (* [unabbrev_term rmap oc t] prints on [oc] the term [t] with term
@@ -136,10 +148,20 @@ let unabbrev_term =
        try name oc (List.assoc t rmap)
        with Not_found -> out oc "/*%a*/(el %a)" name n typ b
      end
-  | Const _ -> raw_term oc t
-  | Comb(_,_) ->
+  | Const(_,_) -> raw_term oc t
+  | Comb(u,v) ->
      let h, ts = head_args t in
      out oc "(%a%a)" (term rmap) h (list_prefix " " (term rmap)) ts
+     (*begin match h with
+     | Const(n,b) ->
+        let k = if n = "=" then 2 else arity b in
+        if List.compare_length_with ts k < 0 then
+          out oc "(@%a%a%a)" name n
+            (list_prefix " " typ) (List.map (subtyp b) (const_typ_vars_pos n))
+            (list_prefix " " (term rmap)) ts
+        else out oc "(%a%a)" name n (list_prefix " " (term rmap)) ts
+     | _ -> out oc "(%a%a)" (term rmap) h (list_prefix " " (term rmap)) ts
+     end*)
   | Abs(u,v) ->
      let rmap' = add_var rmap u in
      out oc "(λ %a, %a)" (decl_var rmap') u (term rmap') v
@@ -162,14 +184,18 @@ let abbrev_term =
          map_term := MapTrm.add t x !map_term;
          k
     in
-    out oc "(term%d%a%a)"
-      k (list_prefix " " raw_typ) tvs (list_prefix " " raw_term) vs
+    match tvs, vs with
+    | [], [] -> out oc "term%d" k
+    | _ ->
+       out oc "(term%d%a%a)"
+         k (list_prefix " " raw_typ) tvs (list_prefix " " raw_term) vs
   in
   fun oc t ->
   match t with
-  | Var _
-  | Const _ -> raw_term oc t
-  | Comb(Comb(Const("=",b),u),v) -> out oc "(= %a %a)" abbrev u abbrev v
+  | Var(_,_)
+  | Const(_,_) -> raw_term oc t
+  | Comb(Comb(Const("=",b),u),v) ->
+     out oc "(@= %a %a %a)" typ (get_domain b) abbrev u abbrev v
   | _ -> abbrev oc t
 ;;
 
@@ -445,14 +471,14 @@ symbol MK_COMB [a b] [s t : El (fun a b)] [u v : El a] :
 symbol EQ_MP [p q : El bool] : Prf (= p q) → Prf p → Prf q;
 symbol TRANS [a] [x y z : El a] :
   Prf (= x y) → Prf (= y z) → Prf (= x z) ≔
-  λ xy: Prf (@= a x y), λ yz: Prf (@= a y z),
-    @EQ_MP (@= a x y) (@= a x z)
-      (@MK_COMB a bool (@= a x) (@= a x) y z (@REFL (fun a bool) (@= a x)) yz)
-      xy;
 /*begin
   assume a x y z xy yz; apply EQ_MP _ xy; apply MK_COMB (REFL (= x)) yz;
   flag \"print_implicits\" on; flag \"print_domains\" on; proofterm;
-end;*/\n
+end;*/
+  λ xy : Prf (= x y), λ yz : Prf (= y z),
+    @EQ_MP (= x y) (= x z)
+      (@MK_COMB a bool (@= a x) (@= a x) y z (@REFL (fun a bool) (@= a x)) yz)
+      xy;\n
 /* definitional axioms */
 %a
 /* theorems */

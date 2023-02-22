@@ -197,11 +197,11 @@ It slightly improves on the performances of ProofTrace which takes
 On `hol.ml` until `arith.ml` (by commenting from `loads "wf.ml"` to the end):
 - ocaml proof checking: 12.5s
 - ocaml proof checking and recording: 13.2s
-- dk file generation: 1m33s, 360 Mo
-- checking time with dk check: 1m12s
-- checking time with kocheck -j 7: 50s
-- lp file generation: 59s, 217 Mo
-- checking time with lambdapi: 5m46s
+- dk file generation: 2m6s, 153 Mo
+- checking time with dk check: 26s
+- checking time with kocheck -j 7: 22s
+- lp file generation: 1m8s, 107 Mo
+- checking time with lambdapi: 2m49s
 
 Implementation
 --------------
