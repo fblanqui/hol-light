@@ -69,8 +69,8 @@ let el_added = ref false;;
 let use_abbrev = ref true;;
 
 (* file basename for dk output. *)
-let basename = ref "foo";;
+(*let basename = ref "foo";;*)
 
 (* indicates whether names must be qualified. *)
-type stage = Types | Terms | Proofs | No_abbrev;;
-let stage = ref No_abbrev;;
+(*type stage = Types | Terms | Proofs | No_abbrev;;
+let stage = ref No_abbrev;;*)

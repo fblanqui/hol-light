@@ -35,18 +35,16 @@ let name oc n = string oc (valid_name n);;
 
 let suffix s oc n = name oc (n ^ s);;
 
-let prefix s oc n = name oc (s ^ n);;
-
-let typ_name oc n =
-  match !stage with
+let typ_name oc n = name oc n
+  (*match !stage with
   | Types | No_abbrev -> name oc n
-  | _ -> out oc "%s_types.%a" !basename name n
+  | _ -> out oc "%s_types.%a" !basename name n*)
 ;;
 
-let cst_name oc n =
-  match !stage with
+let cst_name oc n = name oc n
+  (*match !stage with
   | Terms | No_abbrev -> name oc n
-  | _ -> out oc "%s_terms.%a" !basename name n
+  | _ -> out oc "%s_terms.%a" !basename name n*)
 ;;
 
 (****************************************************************************)
@@ -510,10 +508,10 @@ let proofs_in_range oc = function
 ;;
 
 (****************************************************************************)
-(* Generation of the encoding symbols. *)
+(* Generation of encoding symbols. *)
 (****************************************************************************)
 
-let qualify_types s =
+(*let qualify_types s =
   let re = Str.regexp "\\(Set\\|bool\\)" in
   let r = !basename ^ "_types.\1" in
   let s = Str.global_replace re r s in
@@ -526,15 +524,15 @@ let qualify_terms s =
   let re = Str.regexp "\\(El\\|eq\\)" in
   let r = !basename ^ "_terms.\1" in
   Str.global_replace re r (qualify_types s)
-;;
+;;*)
 
-let decl_Prf() = qualify_terms "injective Prf : El bool -> Type.";;
+let decl_Prf() = (*qualify_terms*) "injective Prf : El bool -> Type.";;
 
-let decl_El() = qualify_types
+let decl_El() = (*qualify_types*)
 "injective El : Set -> Type.
 [a, b] El (fun a b) --> El a -> El b.";;
 
-let decl_rules() = qualify_terms
+let decl_rules() = (*qualify_terms*)
 "def fun_ext : a : Set -> b : Set -> f : El (fun a b) -> g : El (fun a b) ->
   (x : El a -> Prf (eq b (f x) (g x))) -> Prf (eq (fun a b) f g).
 def prop_ext : p : El bool -> q : El bool ->
@@ -560,7 +558,7 @@ thm TRANS : a : Set -> x : El a -> y : El a -> z : El a ->
 (* [export_to_dk_file f r] creates the files "f_types.dk", "f_terms.dk"
    and "f_theorems.dk" for the theorems in range [r]. *)
 let export_to_dk_file f r =
-  basename := f;
+  (*basename := f;*)
   reset_map_typ();
   reset_map_term();
   update_map_const_typ_vars_pos();
@@ -569,10 +567,10 @@ let export_to_dk_file f r =
   let filename = f ^ "_proofs.dk" in
   log "generate %s ...\n%!" filename;
   let oc = open_out filename in
-  stage := Proofs;
+  (*stage := Proofs;*)
   out oc
-"#REQUIRE %s_types.
-#REQUIRE %s_terms.\n
+"(;#REQUIRE %s_types.
+#REQUIRE %s_terms.;)\n
 %s\n
 (; axioms ;)
 %a
@@ -589,9 +587,9 @@ proofs_in_range r;
   let filename = f ^ "_terms.dk" in
   log "generate %s ...\n%!" filename;
   let oc = open_out filename in
-  stage := Terms;
+  (*stage := Terms;*)
   out oc
-"#REQUIRE %s_types.\n
+"(;#REQUIRE %s_types.;)\n
 %s\n
 (; constants ;)
 %a
@@ -602,7 +600,7 @@ proofs_in_range r;
   let filename = f ^ "_types.dk" in
   log "generate %s ...\n%!" filename;
   let oc = open_out filename in
-  stage := Types;
+  (*stage := Types;*)
   out oc
 "Set : Type.\n
 (; types ;)
@@ -610,6 +608,12 @@ proofs_in_range r;
 (; type abbreviations ;)
 %a" (list decl_typ) (types()) decl_map_typ !map_typ;
   close_out oc;
+  let filename = f ^ ".dk" in
+  log "generate %s ...\n%!" filename;
+  let files = f ^ "_types.dk " ^ f ^ "_terms.dk " ^ f ^ "_proofs.dk" in
+  let k = Sys.command ("cat " ^ files ^ " > " ^ filename) in
+  if k <> 0 then exit k;
+  ignore(Sys.command ("rm -f " ^ files));
   print_time()
 ;;
 
@@ -667,12 +671,12 @@ decl_axioms (axioms()) (list decl_def) (definitions())
 
 (* [export_to_dk_file_no_abbrev f r] creates a file of name [f.dk] and
    outputs to this file the proofs in range [r]. *)
-let export_to_dk_file_no_abbrev basename r =
+let export_to_dk_file_no_abbrev f r =
   print_time();
   use_abbrev := false;
-  stage := No_abbrev;
+  (*stage := No_abbrev;*)
   update_map_const_typ_vars_pos();
-  let filename = basename ^ ".dk" in
+  let filename = f ^ ".dk" in
   log "generate %s ...\n%!" filename;
   let oc = open_out filename in
   theory oc;
